@@ -1,0 +1,49 @@
+# --- Contexto de trabajo local (nunca se publica) ---
+Contexto/
+CLAUDE.md
+.claude/
+.cursor/
+NOTAS*.md
+
+# --- Datos de entrada (no son nuestros y pesan) ---
+data/raw/
+data/videos/
+*.mp4
+*.avi
+*.mov
+*.mkv
+!output_ejemplo/**/*.mp4
+
+# --- Pesos y modelos exportados (se hornean en docker build) ---
+weights/*
+!weights/.gitkeep
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# --- Salidas de ejecucion ---
+output/
+runs/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Entorno / editores / SO ---
+.env
+.env.*
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
