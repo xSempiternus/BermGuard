@@ -1,0 +1,13 @@
+# Fijado a las versiones exactas validadas durante el desarrollo.
+# Torch se resuelve desde el indice de CUDA 12.4; ver el Dockerfile.
+torch==2.6.0
+torchvision==0.21.0
+ultralytics==8.4.142
+opencv-python-headless==5.0.0.93
+numpy==2.2.6
+scipy==1.15.3
+scikit-image==0.25.2
+matplotlib==3.10.9
+pydantic==2.13.5
+pydantic-settings==2.15.0
+PyYAML==6.0.3

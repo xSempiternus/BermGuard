@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bermguard"
+version = "0.1.0"
+description = "Safety berm inspection and machinery proximity monitoring for open-pit mine dump points"
+requires-python = ">=3.10"
+dependencies = [
+    "torch==2.6.0",
+    "torchvision==0.21.0",
+    "ultralytics==8.4.142",
+    "opencv-python-headless==5.0.0.93",
+    "numpy==2.2.6",
+    "scipy==1.15.3",
+    "scikit-image==0.25.2",
+    "matplotlib==3.10.9",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "mypy", "pytest"]
+
+[tool.setuptools.packages.find]
+include = ["bermguard*"]
+
+# --- Linting y formato -------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # orden de imports
+    "N",    # convenciones de nombres
+    "UP",   # pyupgrade
+    "B",    # bugbear: bugs probables
+    "SIM",  # simplificacion
+    "RET",  # sentencias return
+    "PTH",  # preferir pathlib sobre os.path
+    "ANN",  # anotaciones faltantes
+]
+ignore = [
+    "ANN401",  # a veces Any es la anotacion honesta
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]      # los tests se leen mejor sin anotar el retorno
+"scripts/*" = ["T201"]   # los scripts de desarrollo pueden imprimir
+
+# --- Tipado estatico ---------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+# Los paquetes de vision y ML de terceros traen informacion de tipos incompleta
+# o inexistente. Silenciarlos aca mantiene util el --strict sobre nuestro propio
+# codigo, en vez de obligar a relajarlo de forma general.
+[[tool.mypy.overrides]]
+module = ["cv2.*", "ultralytics.*", "skimage.*", "scipy.*", "matplotlib.*"]
+ignore_missing_imports = true
+
+# --- Tests -------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
