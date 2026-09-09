@@ -1,0 +1,46 @@
+# Metodo 2 - Representacion aprendida
+#
+# Segmentacion neural del pretil, para contrastar contra el prior geometrico del
+# metodo 1. El eje del benchmark es real: modelo explicito y auditable frente a
+# representacion aprendida de proposito general.
+#
+# Ver docs/adr/0002 (eleccion del detector) y docs/adr/0003 (tomas y luminancia).
+
+method: 2
+name: "Representacion aprendida"
+description: >
+  Segmentacion neural del pretil con propagacion temporal. Mascaras continuas y
+  robustas a cambios de iluminacion, a mayor costo computacional.
+
+detector:
+  weights: weights/yolo11s.pt
+  # Umbral bajo a proposito: el tracker recupera detecciones debiles que uno mas
+  # alto descartaria, y eso importa con polvo y de noche.
+  confidence: 0.25
+  iou: 0.45
+  image_size: 640
+  half_precision: true
+
+lighting:
+  # Calibrados sobre el material de muestra, cuya luminancia media recorre 19-163.
+  # El set de evaluacion es ciego: su generalizacion es un supuesto declarado.
+  night_max: 70.0
+  day_min: 110.0
+
+shots:
+  luma_delta: 20.0
+  min_length: 6
+
+proximity:
+  # Preliminares. La distancia de frenado de un CAEX cargado a 20 km/h ronda los
+  # 30-40 m, de modo que los umbrales son conservadores. Pendiente justificarlos
+  # contra la normativa en el reporte.
+  caution_m: 20.0
+  critical_m: 10.0
+  # Histeresis asimetrica: escalar rapido es seguro, desescalar lento tambien.
+  frames_to_escalate: 3
+  frames_to_deescalate: 10
+
+output:
+  fourcc: mp4v
+  draw_hud: true

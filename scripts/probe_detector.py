@@ -50,14 +50,15 @@ def main() -> None:
                 if index % args.stride:
                     continue
                 sampled += 1
-                result = model.predict(
-                    source=frame, conf=args.conf, device=device, verbose=False
-                )[0]
+                result = model.predict(source=frame, conf=args.conf, device=device, verbose=False)[
+                    0
+                ]
                 if result.boxes is None:
                     continue
                 for cls, conf in zip(
                     result.boxes.cls.cpu().numpy().astype(int),
                     result.boxes.conf.cpu().numpy(),
+                    strict=True,
                 ):
                     counts[int(cls)] += 1
                     conf_sum[int(cls)] += float(conf)

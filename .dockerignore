@@ -1,0 +1,39 @@
+# Contexto de trabajo local: nunca debe entrar a la imagen
+Contexto/
+CLAUDE.md
+.claude/
+
+# Datos y salidas: llegan por volumen montado, no horneados
+data/
+output/
+output_ejemplo/
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Entorno de desarrollo
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Herramientas de desarrollo y documentacion: no las necesita el runtime, y
+# excluirlas reduce el contexto de build y por tanto el tiempo de transferencia
+scripts/
+tests/
+docs/
+.git/
+.github/
+.gitignore
+README.md
+reporte_benchmark.md
+
+# Artefactos de entrenamiento
+weights/training/
+*.onnx
+*.engine

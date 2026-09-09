@@ -19,7 +19,8 @@ detalle de implementación.
 
 from __future__ import annotations
 
-from typing import Mapping, Protocol, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Protocol
 
 from bermguard.core.types import (
     BermPixels,
@@ -58,9 +59,7 @@ class IDetector(Protocol):
 class ITracker(Protocol):
     """Asocia detecciones entre frames y les da identidad persistente."""
 
-    def update(
-        self, detections: Sequence[Detection], frame_index: int
-    ) -> Sequence[Detection]:
+    def update(self, detections: Sequence[Detection], frame_index: int) -> Sequence[Detection]:
         """Devuelve ``detections`` con el ``track_id`` asignado.
 
         Puede devolver cajas que no venían en ``detections``, cuando arrastra un
@@ -81,8 +80,7 @@ class IBermSegmenter(Protocol):
     """
 
     @property
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
     def segment(self, frame: ImageBGR) -> BermPixels | None:
         """Devuelve cresta y base del pretil por columna, o ``None`` si no hay.

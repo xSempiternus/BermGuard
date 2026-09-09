@@ -10,8 +10,8 @@ seguir siendo testeables sin ella.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from bermguard.core.exceptions import ModelLoadError
 from bermguard.core.types import BBox, Detection, ImageBGR, VehicleClass
@@ -20,17 +20,20 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_COCO_CLASS_MAP: Mapping[int, VehicleClass] = {
     7: VehicleClass.CAEX,  # "truck" en COCO
-    5: VehicleClass.UNKNOWN,  # "bus" — la maquinaria grande suele leerse así
-    6: VehicleClass.UNKNOWN,  # "train" — ídem, para cuerpos alargados con oruga
 }
 """Mapeo de id de clase COCO a clase del dominio, para un modelo de estantería.
 
-COCO no contiene maquinaria minera. Un camión de extracción de 300 toneladas no
-es un camión de reparto, y un tractor de oruga no tiene ninguna clase en COCO, así
-que este mapeo es una aproximación deliberada y su tasa de error pertenece al
-reporte de benchmark. Separar bien CAEX de bulldozer requiere fine-tuning sobre
-imágenes del dominio; hasta entonces se usa ``UNKNOWN`` con honestidad en vez de
-adivinar una etiqueta.
+COCO no contiene maquinaria minera. Un camión de extracción de 300 toneladas no es
+un camión de reparto, y un tractor de oruga no tiene ninguna clase en COCO.
+
+El mapeo se redujo a una sola entrada por medición, no por simplicidad: el sondeo
+documentado en `docs/analisis_material.md` muestra que `bus` (5) y `train` (6), que
+se habían incluido preventivamente, **no se activan en ningún frame** del material.
+Mantenerlas sólo habría abierto la puerta a falsos positivos sin aportar cobertura.
+
+Este mapeo es una aproximación declarada y transitoria. El ADR 0002 registra por
+qué se sustituye por un detector especializado: el modelo base fusiona el CAEX con
+el bulldozer en una sola caja, lo que invalida el módulo de proximidad.
 """
 
 
@@ -65,7 +68,9 @@ class YoloDetector:
             image_size: Lado mayor que ve el modelo. Los frames se ajustan con
                 letterbox a ese tamaño, así una fuente 1080p y una 720p se
                 analizan a la misma escala.
-            half_precision: Usar FP16. Se ignora en CPU, donde es más lento.
+            half_precision: Usar FP16. Se ignora en CPU, donde es más lento. La GPU
+                de desarrollo es Ampere y tiene Tensor Cores, así que media
+                precisión aporta rendimiento real y no sólo ahorro de memoria.
             class_map: Reemplaza a :data:`DEFAULT_COCO_CLASS_MAP`.
 
         Raises:
@@ -76,8 +81,11 @@ class YoloDetector:
         self._iou = iou
         self._image_size = image_size
         self._device = device
-        self._half = half_precision and device == "cuda"
         self._weights = str(weights)
+        # Ultralytics 8.4 unifico la precision bajo `quantize`: 16 es FP16 y None
+        # deja FP32. El antiguo `half=True` sigue funcionando pero emite un aviso
+        # de deprecacion por cada llamada, uno por frame.
+        self._quantize: int | None = 16 if (half_precision and device == "cuda") else None
 
         try:
             from ultralytics import YOLO
@@ -89,15 +97,14 @@ class YoloDetector:
             self._model.to(device)
         except Exception as exc:
             raise ModelLoadError(
-                f"No se pudieron cargar los pesos '{self._weights}' en el "
-                f"dispositivo '{device}'"
+                f"No se pudieron cargar los pesos '{self._weights}' en el dispositivo '{device}'"
             ) from exc
 
         logger.info(
             "Detector listo: %s en %s (fp16=%s, imgsz=%d, conf=%.2f)",
             Path(self._weights).name,
             device,
-            self._half,
+            self._quantize == 16,
             image_size,
             confidence,
         )
@@ -119,7 +126,7 @@ class YoloDetector:
             iou=self._iou,
             imgsz=self._image_size,
             device=self._device,
-            half=self._half,
+            quantize=self._quantize,
             classes=list(self._class_map),
             verbose=False,
         )
@@ -141,5 +148,5 @@ class YoloDetector:
                 bbox=BBox(float(x1), float(y1), float(x2), float(y2)),
                 confidence=float(conf),
             )
-            for (x1, y1, x2, y2), conf, cls in zip(xyxy, confidences, class_ids)
+            for (x1, y1, x2, y2), conf, cls in zip(xyxy, confidences, class_ids, strict=True)
         ]

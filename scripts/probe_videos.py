@@ -17,10 +17,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import cv2
 import numpy as np
 
 from bermguard.io.video_reader import VideoReader, discover_videos
+from bermguard.vision.lighting import classify_luma, mean_luma
 
 CUT_LUMA_DELTA = 20.0
 """Salto de luminancia media entre frames consecutivos que se considera un corte.
@@ -32,17 +32,9 @@ los separa igual de bien, porque un corte entre dos tomas del mismo encuadre
 cambia poco la estructura y mucho la exposición.
 """
 
-NIGHT_MAX_LUMA = 70.0
-DAY_MIN_LUMA = 110.0
-"""Cortes de clasificación de la condición lumínica, sobre la luminancia media."""
-
-
-def clasificar(luma: float) -> str:
-    if luma < NIGHT_MAX_LUMA:
-        return "night"
-    if luma > DAY_MIN_LUMA:
-        return "day"
-    return "dusk"
+# La clasificación lumínica vive en bermguard.vision.lighting porque el pipeline
+# también la necesita (ADR 0003). Duplicarla acá haría que este reporte y el
+# sistema pudieran divergir en silencio.
 
 
 def main() -> None:
@@ -55,8 +47,7 @@ def main() -> None:
         with VideoReader(video) as reader:
             info = reader.info
             for _index, _timestamp, frame in reader.frames():
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                lumas.append(float(gray.mean()))
+                lumas.append(mean_luma(frame))
 
         serie = np.asarray(lumas, dtype=np.float64)
         deltas = np.abs(np.diff(serie))
@@ -67,10 +58,7 @@ def main() -> None:
             f"  {info.width}x{info.height} @ {info.fps:g} fps, "
             f"{len(serie)} frames decodificados ({info.frame_count} declarados)"
         )
-        print(
-            f"  luminancia: min={serie.min():.0f} max={serie.max():.0f} "
-            f"media={serie.mean():.0f}"
-        )
+        print(f"  luminancia: min={serie.min():.0f} max={serie.max():.0f} media={serie.mean():.0f}")
 
         if cortes.size:
             print(f"  cortes duros: {cortes.size}")
@@ -82,7 +70,7 @@ def main() -> None:
         else:
             print("  cortes duros: ninguno (transiciones graduales)")
 
-        condiciones = [clasificar(v) for v in serie]
+        condiciones = [classify_luma(v).value for v in serie]
         reparto = {c: condiciones.count(c) / len(condiciones) for c in set(condiciones)}
         reparto_txt = "  ".join(
             f"{c}={p:.0%}" for c, p in sorted(reparto.items(), key=lambda kv: -kv[1])

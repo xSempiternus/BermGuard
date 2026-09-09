@@ -12,9 +12,10 @@ generado automáticamente reventaría al usarse.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Mapping, Sequence, TypeAlias
+from typing import TypeAlias
 
 import numpy as np
 import numpy.typing as npt
