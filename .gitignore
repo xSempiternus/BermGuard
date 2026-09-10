@@ -15,13 +15,19 @@ data/labeling/
 *.mkv
 !output_ejemplo/**/*.mp4
 
-# --- Pesos y modelos exportados (se hornean en docker build) ---
-weights/*
-!weights/.gitkeep
+# --- Pesos ---
+# Se versionan SOLO los que la imagen necesita para funcionar out-of-the-box.
+# El enunciado exige que el contenedor arranque sin descargas manuales, asi que
+# los pesos tienen que viajar con el repositorio: el evaluador construye la imagen
+# desde este arbol y no tiene de donde sacarlos si no estan aca.
 *.pt
 *.pth
 *.onnx
 *.engine
+weights/*
+!weights/.gitkeep
+!weights/detector_v1.pt
+!weights/yolo11s.pt
 
 # --- Salidas de ejecucion ---
 output/

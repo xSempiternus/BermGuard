@@ -33,7 +33,14 @@ docs/
 README.md
 reporte_benchmark.md
 
-# Artefactos de entrenamiento
+# Artefactos de entrenamiento y pesos que el runtime no usa.
+# weights/clip son 338 MB del encoder de texto que descargo YOLO-World durante la
+# evaluacion del enfoque zero-shot (ADR 0002). Ese enfoque quedo descartado y el
+# pipeline no lo importa, asi que no tiene por que engordar la imagen.
 weights/training/
+weights/clip/
+weights/yolov8s-worldv2.pt
+weights/yolo26n.pt
+runs/
 *.onnx
 *.engine
