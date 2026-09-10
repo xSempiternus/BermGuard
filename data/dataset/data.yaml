@@ -1,0 +1,9 @@
+# Generado por scripts/split_dataset.py
+# Particion agrupada por video. Validacion: video_04 completo.
+# La particion NO es aleatoria: frames vecinos del mismo clip estan
+# correlacionados y mezclarlos entre particiones infla la metrica.
+path: C:/Users/nikoa/Documents/PROJECTS/DeliryumAI/BermGuard/data/dataset
+train: images/train
+val: images/val
+nc: 2
+names: ['caex', 'bulldozer']

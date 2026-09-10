@@ -72,7 +72,7 @@ class OsdRenderer:
         grosor = max(2, round(alto / 360))
         escala = alto / 900.0
 
-        if result.berm is not None:
+        if result.berm_pixels is not None:
             self._dibujar_pretil(lienzo, result, grosor)
 
         for deteccion in result.detections:
@@ -112,8 +112,9 @@ class OsdRenderer:
         self._texto_con_fondo(lienzo, etiqueta, (x1, y1), color, escala, grosor)
 
     def _dibujar_pretil(self, lienzo: ImageBGR, result: FrameResult, grosor: int) -> None:
-        assert result.berm is not None
-        pixeles = result.berm.pixels
+        pixeles = result.berm_pixels
+        if pixeles is None:
+            return
         for serie, color in ((pixeles.crest_y_px, COLOR_CRESTA), (pixeles.base_y_px, COLOR_BASE)):
             anterior: tuple[int, int] | None = None
             for x, y in enumerate(serie):
@@ -135,8 +136,8 @@ class OsdRenderer:
             f"equipos: {len(result.detections)}",
             f"{latencia:.0f} ms/frame",
         ]
-        if result.berm is not None:
-            lineas.append(f"pretil: cobertura {result.berm.pixels.coverage:.0%}")
+        if result.berm_pixels is not None:
+            lineas.append(f"pretil: cobertura {result.berm_pixels.coverage:.0%}")
 
         alto_linea = round(26 * escala)
         margen = round(12 * escala)

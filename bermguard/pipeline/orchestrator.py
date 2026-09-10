@@ -155,7 +155,7 @@ class Orchestrator:
 
                     with _cronometro(etapas, "berm"):
                         pixeles = (
-                            self._berm_segmenter.segment(analizado)
+                            self._berm_segmenter.segment(analizado, detecciones)
                             if self._berm_segmenter is not None
                             else None
                         )
@@ -186,6 +186,7 @@ class Orchestrator:
                         index=index,
                         timestamp_s=timestamp,
                         detections=detecciones,
+                        berm_pixels=pixeles,
                         berm=perfil,
                         risk_by_track=riesgos,
                         lighting=luz,
@@ -295,23 +296,23 @@ class Orchestrator:
 
     @staticmethod
     def _fila_perfil(resultado: FrameResult, toma: int) -> dict[str, object]:
+        pixeles = resultado.berm_pixels
         perfil = resultado.berm
-        fila: dict[str, object] = {
+        # La geometria en pixeles y la interpretacion metrica se registran por
+        # separado porque fallan por separado: puede haber pretil bien delineado
+        # sin ninguna escala que lo convierta a metros.
+        return {
             "frame": resultado.index,
             "timestamp_s": round(resultado.timestamp_s, 4),
             "shot": toma,
             "lighting": resultado.lighting.value,
             "detections": len(resultado.detections),
+            "coverage": round(pixeles.coverage, 4) if pixeles else "",
+            "berm_confidence": round(pixeles.confidence, 4) if pixeles else "",
+            "crest_y_median": _mediana_sin_nan(pixeles.crest_y_px) if pixeles else "",
+            "height_m_median": _mediana_sin_nan(perfil.height_m) if perfil else "",
+            "height_ratio_median": _mediana_sin_nan(perfil.height_ratio) if perfil else "",
         }
-        if perfil is None:
-            fila |= {"coverage": "", "height_m_median": "", "height_ratio_median": ""}
-        else:
-            fila |= {
-                "coverage": round(perfil.pixels.coverage, 4),
-                "height_m_median": _mediana_sin_nan(perfil.height_m),
-                "height_ratio_median": _mediana_sin_nan(perfil.height_ratio),
-            }
-        return fila
 
     @staticmethod
     def _filas_eventos(resultado: FrameResult, toma: int) -> list[dict[str, object]]:

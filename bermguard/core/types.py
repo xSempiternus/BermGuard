@@ -238,7 +238,20 @@ class FrameResult:
     index: int
     timestamp_s: float
     detections: Sequence[Detection]
+
+    berm_pixels: BermPixels | None
+    """Geometría del pretil en píxeles, si el segmentador la produjo."""
+
     berm: BermProfile | None
+    """Interpretación métrica de esa geometría, si además se pudo anclar escala.
+
+    Se guardan por separado a propósito. Segmentar y medir son etapas distintas y
+    pueden fallar por separado: el pretil puede estar perfectamente delineado
+    mientras no hay ningún vehículo que sirva de ancla métrica. Colapsar ambas en
+    un solo campo obligaría a descartar una segmentación válida por falta de
+    escala, y el OSD dejaría de dibujar un pretil que sí se conoce.
+    """
+
     risk_by_track: Mapping[int, RiskLevel]
     lighting: LightingCondition
 

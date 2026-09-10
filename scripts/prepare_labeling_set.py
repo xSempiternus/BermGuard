@@ -185,8 +185,14 @@ def main() -> None:
                     "".join(f"{linea}\n" for linea in lineas), encoding="utf-8"
                 )
 
-    # --- Paso 3: descriptor del dataset para Ultralytics ---
-    (args.out / "classes.txt").write_text("\n".join(CLASS_NAMES), encoding="utf-8")
+    # --- Paso 3: descriptores del dataset ---
+    # classes.txt se escribe DENTRO de labels/ y no sólo en la raíz. Es la
+    # convención que esperan las herramientas de anotación: sin ese archivo junto
+    # a los .txt, el índice numérico de cada caja no se puede traducir a un nombre
+    # y la herramienta acaba creando una clase llamada literalmente "0".
+    nombres = "\n".join(CLASS_NAMES) + "\n"
+    (dir_etiquetas / "classes.txt").write_text(nombres, encoding="utf-8")
+    (args.out / "classes.txt").write_text(nombres, encoding="utf-8")
     (args.out / "data.yaml").write_text(
         "# Generado por scripts/prepare_labeling_set.py\n"
         "# Las rutas train/val se completan tras dividir el conjunto anotado.\n"

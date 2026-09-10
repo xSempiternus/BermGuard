@@ -82,11 +82,33 @@ class IBermSegmenter(Protocol):
     @property
     def name(self) -> str: ...
 
-    def segment(self, frame: ImageBGR) -> BermPixels | None:
+    def segment(
+        self, frame: ImageBGR, detections: Sequence[Detection] = ()
+    ) -> BermPixels | None:
         """Devuelve cresta y base del pretil por columna, o ``None`` si no hay.
 
-        ``None`` significa «no hay pretil en este frame», que es un resultado
-        legítimo y se contabiliza como dropout en el benchmark. No es un error.
+        Args:
+            frame: Frame a analizar.
+            detections: Maquinaria localizada en este frame. La segmentación de
+                terreno la necesita por dos razones físicas, no de conveniencia:
+
+                * **Para excluirla.** El pretil es terreno. Una máquina produce
+                  bordes mucho más marcados que un banco de tierra, y sin
+                  enmascararla la búsqueda se engancha a ella.
+                * **Para acotar la búsqueda.** Los puntos de contacto con el suelo
+                  definen la rasante, y el pretil está por encima de ella en el
+                  espacio imagen. Sin esa cota, la medición del material mostró
+                  que la textura del primer plano —huellas de neumático, sombras
+                  largas— domina sobre la firma del pretil.
+
+                Es opcional: no hay maquinaria visible en todos los frames. Una
+                implementación debe entregar su mejor estimación con lo que tenga
+                y reflejar la carencia en ``confidence``, en vez de negarse a
+                responder o de fingir certeza.
+
+        Returns:
+            ``None`` significa «no hay pretil en este frame», que es un resultado
+            legítimo y se contabiliza como dropout en el benchmark. No es un error.
         """
         ...
 
