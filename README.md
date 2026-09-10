@@ -4,6 +4,12 @@ Pipeline de visión por computadora para faenas mineras a rajo abierto. Sobre un
 videos de botadero, produce por cada uno: un video anotado, la segmentación del pretil de
 seguridad, la evaluación de proximidad entre maquinaria y los metadatos de ejecución.
 
+**Por dónde empezar.** El resultado se ve en
+`output_ejemplo/video_04/method_1/video_04_osd.mp4` — la única salida producida sobre
+material que el detector nunca vio. Este README explica cómo se ejecuta y qué decisiones
+lo sostienen; [`reporte_benchmark.md`](reporte_benchmark.md) contiene la comparación de
+los métodos y las mediciones.
+
 ---
 
 ## Ejecución

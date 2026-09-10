@@ -1,11 +1,55 @@
 # Reporte de benchmark — BermGuard AI
 
 Comparación de los métodos implementados, sobre el material de muestra: 4 videos,
-1.022 frames, en dos resoluciones y con condiciones lumínicas que van de luma media 19
-a 163.
+1.022 frames, en dos resoluciones y con condiciones lumínicas que recorren de luma
+media 19 a 163 — dos órdenes de magnitud de contraste entre las escenas nocturnas y
+las diurnas.
 
 Todo lo que sigue es medido y reproducible con los comandos que se indican. Cuando una
 cifra no se puede interpretar, el reporte lo dice en lugar de presentarla.
+
+---
+
+## 0. Los dos métodos se ejecutaron sobre los cuatro videos
+
+Antes de las comparaciones, la evidencia de que ambos corrieron de verdad.
+
+Un solo comando ejecuta los dos métodos sobre todos los videos de la carpeta de
+entrada — es el argumento «todo en 1» que pide el enunciado:
+
+```bash
+python main.py --input data/raw --output output --method all
+```
+
+Produce **8 corridas**: 4 videos × 2 métodos, cada una con su subdirectorio propio.
+
+```
+output/
+├── run_metadata.json
+├── video_01/
+│   ├── method_1/    <- camino optimo
+│   └── method_2/    <- linea base por argmax
+├── video_02/  (method_1, method_2)
+├── video_03/  (method_1, method_2)
+└── video_04/  (method_1, method_2)
+```
+
+Cada `metadata.json` registra qué método lo produjo y con qué resultado. Sobre
+`video_02`, por ejemplo:
+
+| Campo | `method_1` | `method_2` |
+|---|---|---|
+| `method_name` | Prior geométrico | Línea base por argmax |
+| `berm_crest_jitter_px` | **17.34** | 24.11 |
+| `average_fps` | 13.1 | **16.6** |
+| `proximity_alerts` | 12 | 12 |
+
+Los números difieren porque los métodos difieren; las alertas coinciden porque el
+módulo de proximidad es común a ambos y no depende de cómo se segmente el terreno.
+
+En `output_ejemplo/` del repositorio están los artefactos reales de esa corrida:
+los cuatro videos con el Método 1, y `video_02` también con el Método 2 para que el
+contraste se pueda ver y no sólo leer.
 
 ---
 
@@ -36,7 +80,7 @@ aislado: la diferencia medida es atribuible a la formulación y a nada más.
 
 | Métrica | Qué mide | Por qué se eligió |
 |---|---|---|
-| **mAP@0.5 por clase** | Calidad de detección | @0.5 y no @0.5:0.95 porque para disparar una alerta de proximidad importa *detectar* el equipo, no bordearlo al píxel. **Por clase y no global**: con un desbalance de 7:1 el promedio queda dominado por la mayoritaria |
+| **mAP 0.5 por clase** | Calidad de detección | 0.5 y no 0.5:0.95 porque para disparar una alerta de proximidad importa *detectar* el equipo, no bordearlo al píxel. **Por clase y no global**: con un desbalance de 7:1 el promedio queda dominado por la mayoritaria |
 | **Precisión y recall** | Errores de cada tipo | En seguridad los dos errores no son equivalentes: un equipo no detectado es un riesgo no vigilado; un falso positivo es una alarma espuria. Un mAP no los separa |
 | **Jitter de la cresta (px)** | Estabilidad temporal del perfil | Es la métrica que el enunciado pide sin nombrarla al penalizar el «parpadeo». Y es la **única** medida de calidad de segmentación disponible sin ground truth |
 | **ms/frame y percentil 95** | Costo computacional | El p95 acompaña a la media porque un pipeline de video se percibe por sus peores frames |
@@ -162,11 +206,27 @@ a **no fusionar máquinas adyacentes**, y el problema bloqueante era ese.
 
 Reproducible con `python main.py --input data/raw --output output --method all`.
 
-Ambos métodos comparten CLAHE sobre luminancia, gradiente vertical positivo a escala
-gruesa, exclusión de las cajas de maquinaria y banda de búsqueda entre el horizonte y
-la rasante. **Difieren sólo en cuándo se impone el prior de continuidad:** el Método 1
-lo impone *durante* la búsqueda como restricción; el Método 2 *después*, mediante
-filtrado.
+### 4.0 La diferencia, en una frase
+
+El pretil es una estructura **continua**: su cresta no puede saltar de una columna a la
+siguiente. Ese hecho es un prior fuerte, y los dos métodos lo usan en momentos
+distintos.
+
+| | Cómo decide la cresta |
+|---|---|
+| **Método 1** — camino óptimo | Busca el recorrido de máxima respuesta a través de **todas** las columnas a la vez, con el salto vertical acotado entre columnas contiguas. Ninguna columna puede elegir un valor incompatible con sus vecinas, porque la continuidad es una **restricción de la búsqueda** |
+| **Método 2** — argmax por columna | Cada columna toma su propio máximo **de forma independiente**, sin mirar a las demás, y después un filtro intenta reparar el perfil resultante |
+
+Y de ahí sale la predicción que el benchmark confirma: **el filtrado no puede recuperar
+lo que el `argmax` descartó.** Cuando el filtro actúa, la información de continuidad ya
+se perdió — cada columna eligió su máximo local sin saber nada de sus vecinas, y
+suavizar una secuencia de decisiones malas no produce una buena.
+
+Todo lo demás es **idéntico** entre ambos: CLAHE sobre luminancia, gradiente vertical
+positivo a escala gruesa, exclusión de las cajas de maquinaria, banda de búsqueda entre
+el horizonte y la rasante, y el mismo estimador de altura. Es deliberado — con el
+preprocesado compartido, la diferencia medida es atribuible a la formulación y a nada
+más.
 
 ### 4.1 Resultados agregados
 

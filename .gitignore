@@ -9,6 +9,22 @@ NOTAS*.md
 data/raw/
 data/videos/
 data/labeling/
+
+# La exportacion de la herramienta de anotacion es un intermedio: data/dataset la
+# reemplaza con la particion correcta, agrupada por video.
+data/export/
+
+# Los frames del conjunto de entrenamiento NO se versionan, y es deliberado:
+#
+#   1. Son material del cliente. El repositorio es publico, y redistribuir su
+#      metraje no es algo que corresponda decidir aqui.
+#   2. Se regeneran de forma determinista: prepare_labeling_set.py con la semilla
+#      fijada produce exactamente los mismos 171 frames.
+#
+# Las ANOTACIONES si se versionan (data/dataset/labels): son dos horas de trabajo
+# manual, no se regeneran de ninguna forma, y pesan 166 KB. Con ellas y el script,
+# el entrenamiento es reproducible sin publicar el metraje.
+data/dataset/images/
 *.mp4
 *.avi
 *.mov
