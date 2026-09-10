@@ -13,7 +13,7 @@ description: >
   con supresion por entropia. Rapido, determinista y explicable paso a paso.
 
 detector:
-  weights: weights/yolo11s.pt
+  weights: weights/detector_v1.pt
   # Umbral bajo a proposito: el tracker recupera detecciones debiles que uno mas
   # alto descartaria, y eso importa con polvo y de noche.
   confidence: 0.25

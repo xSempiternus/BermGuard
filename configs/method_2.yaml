@@ -13,7 +13,7 @@ description: >
   robustas a cambios de iluminacion, a mayor costo computacional.
 
 detector:
-  weights: weights/yolo11s.pt
+  weights: weights/detector_v1.pt
   # Umbral bajo a proposito: el tracker recupera detecciones debiles que uno mas
   # alto descartaria, y eso importa con polvo y de noche.
   confidence: 0.25
