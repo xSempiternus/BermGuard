@@ -1,0 +1,17 @@
+{
+  "modelo_base": "yolo11s.pt",
+  "dataset": "data\\dataset\\data.yaml",
+  "epocas": 80,
+  "batch": 8,
+  "imgsz": 640,
+  "freeze": 0,
+  "semilla": 0,
+  "runtime": {
+    "device": "cuda",
+    "torch_version": "2.6.0+cu124",
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+    "cuda_version": "12.4"
+  },
+  "pesos": "C:\\Users\\nikoa\\Documents\\PROJECTS\\DeliryumAI\\BermGuard\\runs\\detect\\weights\\training\\detector\\weights\\best.pt"
+}
