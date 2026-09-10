@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+from bermguard.analytics.height import GroundPlaneHeightEstimator
 from bermguard.analytics.proximity import ProximityAnalyzer
 from bermguard.core.config import PipelineConfig
 from bermguard.core.exceptions import ConfigError
@@ -70,10 +71,13 @@ def build_orchestrator(config: PipelineConfig, device: str) -> Orchestrator:
         horizontal_fov_deg=config.proximity.horizontal_fov_deg,
     )
 
-    # La estimacion de altura metrica aun no esta implementada. Se pasan como
-    # ausentes en lugar de con implementaciones vacias: el orquestador distingue
-    # "no calculado" de "calculado y sin resultado", y esa diferencia queda
-    # registrada en los avisos del metadata.json.
+    # El estimador de altura y el de proximidad comparten el campo de vision
+    # asumido, porque ambos derivan del mismo modelo de plano de suelo. Tenerlo en
+    # un solo lugar de la configuracion evita que discrepen.
+    altura = GroundPlaneHeightEstimator(horizontal_fov_deg=config.proximity.horizontal_fov_deg)
+
+    # El preprocesador se pasa ausente y no como una implementacion vacia: el
+    # detector opera sobre frames sin acondicionar por decision explicita (ADR 0005).
     return Orchestrator(
         config=config,
         detector=detector,
@@ -81,6 +85,6 @@ def build_orchestrator(config: PipelineConfig, device: str) -> Orchestrator:
         preprocessor=None,
         tracker=tracker,
         berm_segmenter=berm,
-        height_estimator=None,
+        height_estimator=altura,
         proximity=proximity,
     )

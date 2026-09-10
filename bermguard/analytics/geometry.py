@@ -82,6 +82,15 @@ class GroundPlaneModel:
     """Número de detecciones que contribuyeron al ajuste. Con una sola, la escala
     depende de un único objeto y su error de caja se propaga sin promediar."""
 
+    camera_height_spread_m: float = 0.0
+    """Dispersión entre las alturas de cámara que implica cada ancla, medida como
+    semirrango intercuartílico.
+
+    Es una medida **observada** de la incertidumbre del ancla, no un modelo de
+    error: si tres CAEX implican alturas de cámara distintas, esa discrepancia
+    acota lo que la escala puede saber. Vale cero con una sola ancla, y entonces la
+    incertidumbre hay que declararla en lugar de medirla."""
+
     def project(self, x_px: float, y_px: float) -> tuple[float, float] | None:
         """Proyecta un punto del suelo a ``(lateral_m, profundidad_m)``.
 
@@ -159,12 +168,19 @@ def fit_ground_plane(
             "No hay ningun CAEX utilizable como ancla metrica en este frame"
         )
 
+    arreglo = np.asarray(alturas, dtype=np.float64)
+    dispersion = (
+        float(np.percentile(arreglo, 75) - np.percentile(arreglo, 25)) / 2.0
+        if arreglo.size >= 2
+        else 0.0
+    )
     return GroundPlaneModel(
         horizon_y_px=horizon_y_px,
         focal_px=focal_px,
-        camera_height_m=float(np.median(alturas)),
+        camera_height_m=float(np.median(arreglo)),
         principal_x_px=principal_x,
-        anchors=len(alturas),
+        anchors=int(arreglo.size),
+        camera_height_spread_m=dispersion,
     )
 
 

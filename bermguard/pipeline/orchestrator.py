@@ -22,7 +22,14 @@ from pathlib import Path
 
 import cv2
 
-from bermguard.analytics.geometry import estimate_horizon
+from bermguard.analytics.geometry import estimate_horizon, world_positions
+from bermguard.analytics.height import median_height
+from bermguard.analytics.plots import (
+    VideoSeries,
+    distance_rows,
+    plot_berm_height,
+    plot_spatial_and_distances,
+)
 from bermguard.core.config import PipelineConfig
 from bermguard.core.device import describe_runtime
 from bermguard.core.interfaces import (
@@ -119,6 +126,7 @@ class Orchestrator:
         filas_perfil: list[dict[str, object]] = []
         filas_eventos: list[dict[str, object]] = []
         avisos: list[str] = []
+        series = VideoSeries()
 
         inicio = time.perf_counter()
 
@@ -170,6 +178,10 @@ class Orchestrator:
                         )
 
                     with _cronometro(etapas, "height"):
+                        if self._height_estimator is not None:
+                            observar = getattr(self._height_estimator, "observe_frame", None)
+                            if observar is not None:
+                                observar(horizonte, info.width)
                         perfil = (
                             self._height_estimator.estimate(pixeles, detecciones, index)
                             if self._height_estimator is not None and pixeles is not None
@@ -188,6 +200,18 @@ class Orchestrator:
                         distancia_minima = min(distancias.values()) if distancias else None
 
                     alertas += self._contar_escaladas(riesgos, riesgo_previo)
+
+                    modelo = getattr(self._proximity, "model", None)
+                    if modelo is not None:
+                        series.record_positions(world_positions(list(detecciones), modelo), riesgos)
+                    series.record_distances(distancias)
+                    series.record_frame(
+                        timestamp,
+                        detector_de_tomas.shot_index,
+                        median_height(perfil) if perfil is not None else None,
+                        float(_nanmediana(perfil.height_m_lo)) if perfil is not None else None,
+                        float(_nanmediana(perfil.height_m_hi)) if perfil is not None else None,
+                    )
 
                     if self._berm_segmenter is not None:
                         if pixeles is None:
@@ -265,6 +289,10 @@ class Orchestrator:
             code_version=code_version(),
             warnings=avisos,
         )
+
+        plot_berm_height(series, output_dir / "berm_height")
+        plot_spatial_and_distances(series, output_dir / "vehicle_spatial")
+        write_csv(distance_rows(series), output_dir / "distance_matrix.csv")
 
         write_json(metadatos, output_dir / "metadata.json")
         write_csv(filas_perfil, output_dir / "berm_profile.csv")
@@ -358,6 +386,15 @@ def _cronometro(destino: dict[str, float], etapa: str) -> Iterator[None]:
         yield
     finally:
         destino[etapa] = destino.get(etapa, 0.0) + (time.perf_counter() - inicio) * 1000.0
+
+
+def _nanmediana(serie: object) -> float:
+    """Mediana ignorando NaN, o NaN si no hay ningun valor valido."""
+    import numpy as np
+
+    arreglo = np.asarray(serie, dtype=float)
+    validos = arreglo[~np.isnan(arreglo)]
+    return float(np.median(validos)) if validos.size else float("nan")
 
 
 def _percentil(valores: Sequence[float], percentil: float) -> float:
