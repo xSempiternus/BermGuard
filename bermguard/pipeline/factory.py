@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+from bermguard.analytics.proximity import ProximityAnalyzer
 from bermguard.core.config import PipelineConfig
 from bermguard.core.exceptions import ConfigError
 from bermguard.pipeline.orchestrator import Orchestrator
@@ -53,6 +54,7 @@ def build_orchestrator(config: PipelineConfig, device: str) -> Orchestrator:
         max_age=config.tracker.max_age,
         iou_high=config.tracker.iou_high,
         iou_low=config.tracker.iou_low,
+        duplicate_containment=config.tracker.duplicate_containment,
         velocity_smoothing=config.tracker.velocity_smoothing,
     )
 
@@ -60,7 +62,15 @@ def build_orchestrator(config: PipelineConfig, device: str) -> Orchestrator:
     # usara una representacion aprendida, que es el eje del benchmark.
     berm = ClassicalBermSegmenter() if config.method == 1 else None
 
-    # Altura y proximidad aun no estan implementadas. Se pasan como
+    proximity = ProximityAnalyzer(
+        caution_m=config.proximity.caution_m,
+        critical_m=config.proximity.critical_m,
+        frames_to_escalate=config.proximity.frames_to_escalate,
+        frames_to_deescalate=config.proximity.frames_to_deescalate,
+        horizontal_fov_deg=config.proximity.horizontal_fov_deg,
+    )
+
+    # La estimacion de altura metrica aun no esta implementada. Se pasan como
     # ausentes en lugar de con implementaciones vacias: el orquestador distingue
     # "no calculado" de "calculado y sin resultado", y esa diferencia queda
     # registrada en los avisos del metadata.json.
@@ -72,5 +82,5 @@ def build_orchestrator(config: PipelineConfig, device: str) -> Orchestrator:
         tracker=tracker,
         berm_segmenter=berm,
         height_estimator=None,
-        proximity=None,
+        proximity=proximity,
     )

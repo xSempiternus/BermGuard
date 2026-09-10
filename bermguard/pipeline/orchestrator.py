@@ -20,6 +20,9 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
+import cv2
+
+from bermguard.analytics.geometry import estimate_horizon
 from bermguard.core.config import PipelineConfig
 from bermguard.core.device import describe_runtime
 from bermguard.core.interfaces import (
@@ -47,7 +50,7 @@ from bermguard.io.artifacts import (
 from bermguard.io.video_reader import VideoReader
 from bermguard.io.video_writer import VideoWriter
 from bermguard.pipeline.osd import OsdRenderer
-from bermguard.vision.lighting import LightingThresholds, classify_luma, mean_luma
+from bermguard.vision.lighting import LightingThresholds, classify_luma
 from bermguard.vision.shots import ShotDetector
 
 logger = logging.getLogger(__name__)
@@ -136,7 +139,13 @@ class Orchestrator:
                             riesgo_previo.clear()
 
                     with _cronometro(etapas, "lighting"):
-                        luz = classify_luma(mean_luma(frame), self._umbrales_luz)
+                        # El gris se calcula una vez y sirve a dos consumidores: la
+                        # clasificacion luminica y la estimacion del horizonte. Ambos
+                        # dependen de la misma senal, y compartirla evita que
+                        # discrepen sobre donde empieza el terreno.
+                        gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                        luz = classify_luma(float(gris.mean()), self._umbrales_luz)
+                        horizonte = estimate_horizon(gris)
                     conteo_luz[luz] += 1
 
                     with _cronometro(etapas, "preprocess"):
@@ -169,10 +178,14 @@ class Orchestrator:
 
                     with _cronometro(etapas, "proximity"):
                         riesgos = (
-                            dict(self._proximity.evaluate(detecciones, index))
+                            dict(
+                                self._proximity.evaluate(detecciones, index, horizonte, info.width)
+                            )
                             if self._proximity is not None
                             else {}
                         )
+                        distancias = getattr(self._proximity, "last_distances", {})
+                        distancia_minima = min(distancias.values()) if distancias else None
 
                     alertas += self._contar_escaladas(riesgos, riesgo_previo)
 
@@ -197,7 +210,9 @@ class Orchestrator:
                         anotado = self._osd.render(frame, resultado)
                     writer.write(anotado)
 
-                    filas_perfil.append(self._fila_perfil(resultado, detector_de_tomas.shot_index))
+                    filas_perfil.append(
+                        self._fila_perfil(resultado, detector_de_tomas.shot_index, distancia_minima)
+                    )
                     filas_eventos.extend(
                         self._filas_eventos(resultado, detector_de_tomas.shot_index)
                     )
@@ -295,7 +310,9 @@ class Orchestrator:
         return escaladas
 
     @staticmethod
-    def _fila_perfil(resultado: FrameResult, toma: int) -> dict[str, object]:
+    def _fila_perfil(
+        resultado: FrameResult, toma: int, distancia_minima_m: float | None = None
+    ) -> dict[str, object]:
         pixeles = resultado.berm_pixels
         perfil = resultado.berm
         # La geometria en pixeles y la interpretacion metrica se registran por
@@ -307,6 +324,7 @@ class Orchestrator:
             "shot": toma,
             "lighting": resultado.lighting.value,
             "detections": len(resultado.detections),
+            "min_distance_m": round(distancia_minima_m, 2) if distancia_minima_m else "",
             "coverage": round(pixeles.coverage, 4) if pixeles else "",
             "berm_confidence": round(pixeles.confidence, 4) if pixeles else "",
             "crest_y_median": _mediana_sin_nan(pixeles.crest_y_px) if pixeles else "",

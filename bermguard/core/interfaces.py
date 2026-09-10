@@ -147,9 +147,17 @@ class IProximityAnalyzer(Protocol):
     """Asigna un nivel de riesgo a cada máquina trackeada."""
 
     def evaluate(
-        self, detections: Sequence[Detection], frame_index: int
+        self,
+        detections: Sequence[Detection],
+        frame_index: int,
+        horizon_y_px: float | None = None,
+        frame_width: int = 0,
     ) -> Mapping[int, RiskLevel]:
         """Devuelve el nivel de riesgo por ``track_id``.
+
+        La geometría del frame llega como números —la fila del horizonte y el ancho—
+        y nunca como imagen, de modo que una implementación puede convertir píxeles a
+        metros sin depender de OpenCV ni de un archivo de video.
 
         Se espera que las implementaciones apliquen histéresis: un nivel que
         cambia en cada frame porque la distancia oscila alrededor del umbral

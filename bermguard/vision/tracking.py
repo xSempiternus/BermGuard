@@ -61,6 +61,27 @@ def iou(a: BBox, b: BBox) -> float:
     return float(interseccion / union) if union > 0 else 0.0
 
 
+def containment(a: BBox, b: BBox) -> float:
+    """Intersección sobre el área de la caja menor, en ``[0, 1]``.
+
+    Distinta del IoU y necesaria para un fallo concreto: dos cajas **desplazadas
+    sobre el mismo objeto** tienen IoU moderado —del orden de 0.35— porque la unión
+    crece tanto como la intersección, de modo que un umbral de IoU no las reconoce
+    como duplicadas sin descartar también equipos realmente distintos. Referida al
+    área menor, la medida sí es alta: la caja pequeña está contenida en buena parte
+    dentro de la grande.
+    """
+    x1 = max(a.x1, b.x1)
+    y1 = max(a.y1, b.y1)
+    x2 = min(a.x2, b.x2)
+    y2 = min(a.y2, b.y2)
+    if x2 <= x1 or y2 <= y1:
+        return 0.0
+    interseccion = (x2 - x1) * (y2 - y1)
+    menor = min(a.width * a.height, b.width * b.height)
+    return float(interseccion / menor) if menor > 0 else 0.0
+
+
 @dataclass(slots=True)
 class _Track:
     """Estado interno de un track. Mutable, a diferencia de los tipos del dominio."""
@@ -144,6 +165,7 @@ class IouTracker:
         max_age: int = 8,
         iou_high: float = 0.30,
         iou_low: float = 0.15,
+        duplicate_containment: float = 0.60,
         velocity_smoothing: float = 0.5,
     ) -> None:
         """
@@ -162,6 +184,11 @@ class IouTracker:
                 ronda.
             iou_low: Solape mínimo en la segunda ronda. Más permisivo, porque una
                 detección débil suele traer la caja peor ajustada.
+            duplicate_containment: Contención (ver :func:`containment`) por encima
+                de la cual una detección sin pareja se considera una caja duplicada
+                sobre un track existente, y no un equipo nuevo. Bajarlo descarta
+                equipos que circulan realmente juntos; subirlo deja entrar entidades
+                fantasma.
             velocity_smoothing: Peso del desplazamiento observado al actualizar la
                 velocidad.
         """
@@ -170,6 +197,7 @@ class IouTracker:
         self._max_age = max_age
         self._iou_high = iou_high
         self._iou_low = iou_low
+        self._duplicate_containment = duplicate_containment
         self._suavizado = velocity_smoothing
 
         self._tracks: list[_Track] = []
@@ -208,6 +236,26 @@ class IouTracker:
             self._tracks[indice_track].arrastrar()
 
         for deteccion in dets_libres:
+            # Supresion a nivel de track. Una deteccion que se solapa fuertemente con
+            # un track existente es casi siempre una caja duplicada sobre la misma
+            # maquina, no un equipo nuevo.
+            #
+            # No es una precaucion teorica: el detector tiene precision 0.297 y emite
+            # cajas solapadas que sobreviven al NMS del propio modelo. Sin este filtro
+            # el tracker las confirmaba como dos equipos distintos separados menos de
+            # un metro, y el modulo de proximidad los reportaba en alerta critica. Una
+            # entidad fantasma no solo ensucia el conteo: dispara alarmas sin causa,
+            # que es precisamente lo que la histeresis existe para evitar.
+            if any(
+                containment(track.bbox, deteccion.bbox) > self._duplicate_containment
+                for track in self._tracks
+            ):
+                logger.debug(
+                    "Frame %d: deteccion descartada por solaparse con un track existente",
+                    frame_index,
+                )
+                continue
+
             self._tracks.append(
                 _Track(
                     track_id=self._siguiente_id,
@@ -291,4 +339,4 @@ class IouTracker:
         return emparejados, libres_det, libres_track
 
 
-__all__ = ["IouTracker", "iou"]
+__all__ = ["IouTracker", "containment", "iou"]

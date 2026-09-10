@@ -70,6 +70,12 @@ class TrackerConfig(_Base):
     max_age: int = Field(8, ge=1)
     iou_high: float = Field(0.30, ge=0.0, le=1.0)
     iou_low: float = Field(0.15, ge=0.0, le=1.0)
+    duplicate_containment: float = Field(0.60, ge=0.0, le=1.0)
+    """Contencion por encima de la cual una deteccion nueva se considera duplicada.
+
+    Se mide como interseccion sobre el area menor y no como IoU: dos cajas
+    desplazadas sobre el mismo camion tienen IoU moderado y contencion alta.
+    Suprime las entidades fantasma que produce un detector con precision 0.297."""
     velocity_smoothing: float = Field(0.5, gt=0.0, le=1.0)
 
 
@@ -77,6 +83,14 @@ class ProximityConfig(_Base):
     caution_m: float = Field(20.0, gt=0.0)
     critical_m: float = Field(10.0, gt=0.0)
     frames_to_escalate: int = Field(3, ge=1)
+    horizontal_fov_deg: float = Field(60.0, gt=10.0, lt=170.0)
+    """Campo de visión horizontal asumido de la cámara, en grados.
+
+    Es el supuesto más débil de toda la cadena métrica: no hay calibración ni
+    metadatos de montaje, y de este valor depende la focal y por tanto la escala de
+    profundidad. Vive en la configuración precisamente porque es una suposición y no
+    una medición, y su sensibilidad se documenta en el reporte."""
+
     frames_to_deescalate: int = Field(10, ge=1)
     """Histéresis asimétrica: escalar rápido es seguro, desescalar lento también.
     Sin esto el color parpadea cuando la distancia oscila en torno al umbral."""
