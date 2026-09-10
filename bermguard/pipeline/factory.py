@@ -18,6 +18,7 @@ from bermguard.analytics.proximity import ProximityAnalyzer
 from bermguard.core.config import PipelineConfig
 from bermguard.core.exceptions import ConfigError
 from bermguard.pipeline.orchestrator import Orchestrator
+from bermguard.vision.berm.argmax_baseline import ArgmaxBermSegmenter
 from bermguard.vision.berm.classical import ClassicalBermSegmenter
 from bermguard.vision.detectors.yolo_detector import YoloDetector
 from bermguard.vision.tracking import IouTracker
@@ -59,9 +60,11 @@ def build_orchestrator(config: PipelineConfig, device: str) -> Orchestrator:
         velocity_smoothing=config.tracker.velocity_smoothing,
     )
 
-    # El metodo 1 segmenta el pretil con el prior geometrico explicito; el metodo 2
-    # usara una representacion aprendida, que es el eje del benchmark.
-    berm = ClassicalBermSegmenter() if config.method == 1 else None
+    # El eje del benchmark del pretil: donde se impone el prior de continuidad.
+    # El metodo 1 lo impone durante la busqueda (camino optimo); el metodo 2 despues
+    # (argmax por columna mas filtrado). Comparten preprocesado, exclusion de
+    # maquinaria y banda de busqueda, asi que la comparacion aisla la formulacion.
+    berm = ClassicalBermSegmenter() if config.method == 1 else ArgmaxBermSegmenter()
 
     proximity = ProximityAnalyzer(
         caution_m=config.proximity.caution_m,

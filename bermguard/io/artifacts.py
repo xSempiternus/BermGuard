@@ -84,6 +84,18 @@ class VideoMetadata(_Base):
     """Fracción de frames sin pretil detectado. Mide robustez en condiciones
     adversas mejor que el promedio del IoU, que ignora los frames perdidos."""
 
+    berm_crest_jitter_px: float | None = None
+    """Desviación estándar del cambio de la cresta entre frames consecutivos, en
+    píxeles, medida dentro de cada toma.
+
+    Es la métrica que el enunciado pide sin nombrarla: cuantifica el «parpadeo» del
+    perfil. Y es la única medida de calidad de la segmentación que no requiere
+    ground truth, a diferencia de la cobertura, que resultó estar dominada por el
+    umbral de validación y no por la escena (ADR 0006).
+
+    Un pretil físico cambia lentísimo, de modo que todo jitter por encima del ruido
+    de cuantización es error de medición, no señal."""
+
     runtime: dict[str, str | bool] = Field(default_factory=dict)
     code_version: str | None = None
     warnings: list[str] = Field(default_factory=list)

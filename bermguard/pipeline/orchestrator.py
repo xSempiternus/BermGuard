@@ -123,6 +123,7 @@ class Orchestrator:
         alertas = 0
         coberturas: list[float] = []
         frames_sin_pretil = 0
+        crestas_por_toma: list[list[float]] = [[]]
         filas_perfil: list[dict[str, object]] = []
         filas_eventos: list[dict[str, object]] = []
         avisos: list[str] = []
@@ -145,6 +146,10 @@ class Orchestrator:
                         if toma_nueva and index > 0:
                             self._reiniciar_estado()
                             riesgo_previo.clear()
+                            # El jitter se acumula por toma: un corte produce un
+                            # salto enorme que no es error de medicion sino cambio
+                            # de camara, y mezclarlo falsearia la metrica.
+                            crestas_por_toma.append([])
 
                     with _cronometro(etapas, "lighting"):
                         # El gris se calcula una vez y sirve a dos consumidores: la
@@ -218,6 +223,7 @@ class Orchestrator:
                             frames_sin_pretil += 1
                         else:
                             coberturas.append(pixeles.coverage)
+                            crestas_por_toma[-1].append(_nanmediana(pixeles.crest_y_px))
 
                     resultado = FrameResult(
                         index=index,
@@ -285,6 +291,7 @@ class Orchestrator:
             berm_dropout_rate=(
                 frames_sin_pretil / frames if self._berm_segmenter is not None else None
             ),
+            berm_crest_jitter_px=_jitter_por_toma(crestas_por_toma),
             runtime=describe_runtime(self._device),
             code_version=code_version(),
             warnings=avisos,
@@ -386,6 +393,24 @@ def _cronometro(destino: dict[str, float], etapa: str) -> Iterator[None]:
         yield
     finally:
         destino[etapa] = destino.get(etapa, 0.0) + (time.perf_counter() - inicio) * 1000.0
+
+
+def _jitter_por_toma(series_por_toma: list[list[float]]) -> float | None:
+    """Jitter temporal de la cresta, agregado sobre todas las tomas.
+
+    Se calcula por toma y se agrupan las diferencias, en lugar de calcularlo sobre la
+    serie completa: un corte de escena introduce un salto de decenas de pixeles que
+    no es ruido de medicion sino cambio de camara, y contarlo dominaria el resultado.
+    """
+    import numpy as np
+
+    diferencias: list[float] = []
+    for serie in series_por_toma:
+        arreglo = np.asarray(serie, dtype=float)
+        validos = arreglo[~np.isnan(arreglo)]
+        if validos.size >= 2:
+            diferencias.extend(np.abs(np.diff(validos)).tolist())
+    return round(float(np.std(diferencias)), 3) if diferencias else None
 
 
 def _nanmediana(serie: object) -> float:

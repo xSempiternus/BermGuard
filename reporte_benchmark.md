@@ -1,0 +1,414 @@
+# Reporte de benchmark — BermGuard AI
+
+Comparación de los métodos implementados, sobre el material de muestra: 4 videos,
+1.022 frames, en dos resoluciones y con condiciones lumínicas que van de luma media 19
+a 163.
+
+Todo lo que sigue es medido y reproducible con los comandos que se indican. Cuando una
+cifra no se puede interpretar, el reporte lo dice en lugar de presentarla.
+
+---
+
+## 1. Qué se comparó, y qué no
+
+Se midieron **tres ejes**:
+
+| Eje | Método A | Método B | Estado |
+|---|---|---|---|
+| **Detección de maquinaria** | Preentrenado COCO + zero-shot open-vocabulary | Fine-tuning sobre el dominio | Completo |
+| **Segmentación del pretil** | Camino óptimo por programación dinámica | Máximo de gradiente por columna | Completo |
+| **Despliegue** | CPU | CUDA | Completo |
+
+**Lo que no está implementado:** un segmentador **neural** del pretil, que era el
+Método 2 del plan original. Se priorizaron, en este orden, el despliegue Docker
+verificado, el pipeline que no falla sobre material desconocido, y el módulo de
+proximidad —que estaba bloqueado por la detección—. Se declara como trabajo pendiente
+en la sección 8, no como algo omitido por descuido.
+
+El eje de segmentación quedó por tanto entre dos formulaciones que comparten
+preprocesado, exclusión de maquinaria y banda de búsqueda, y difieren **sólo** en
+cómo se decide la cresta. Es un contraste más estrecho que el planificado, pero
+aislado: la diferencia medida es atribuible a la formulación y a nada más.
+
+---
+
+## 2. Elección de métricas
+
+| Métrica | Qué mide | Por qué se eligió |
+|---|---|---|
+| **mAP@0.5 por clase** | Calidad de detección | @0.5 y no @0.5:0.95 porque para disparar una alerta de proximidad importa *detectar* el equipo, no bordearlo al píxel. **Por clase y no global**: con un desbalance de 7:1 el promedio queda dominado por la mayoritaria |
+| **Precisión y recall** | Errores de cada tipo | En seguridad los dos errores no son equivalentes: un equipo no detectado es un riesgo no vigilado; un falso positivo es una alarma espuria. Un mAP no los separa |
+| **Jitter de la cresta (px)** | Estabilidad temporal del perfil | Es la métrica que el enunciado pide sin nombrarla al penalizar el «parpadeo». Y es la **única** medida de calidad de segmentación disponible sin ground truth |
+| **ms/frame y percentil 95** | Costo computacional | El p95 acompaña a la media porque un pipeline de video se percibe por sus peores frames |
+| **Desglose por etapa** | Dónde está el cuello de botella | Un FPS agregado no dice qué optimizar |
+| **Dispersión de la altura entre condiciones** | Error de la medición métrica | Ver sección 6. Es una cota inferior del error obtenida de una invariancia física, sin necesidad de ground truth |
+
+**Métrica descartada tras medirla: la cobertura del pretil.** Se planificó como medida
+de calidad de la segmentación y resultó no medir la escena. El detalle está en la
+sección 5.3.
+
+**No hay mIoU ni ground truth anotado del pretil.** Etiquetar a mano el perfil de la
+cresta en frames estratificados era el plan, y el presupuesto de anotación se destinó
+íntegro al conjunto de entrenamiento del detector, que era el bloqueo del pipeline. Es
+la limitación más importante de este reporte: **sin ground truth no se mide exactitud,
+sólo estabilidad y costo.**
+
+---
+
+## 3. Eje 1 — Detección: zero-shot contra fine-tuning
+
+Reproducible con:
+
+```bash
+python scripts/probe_detector.py data/raw --stride 12
+python scripts/probe_openvocab.py --conf 0.05
+python scripts/eval_detector.py
+```
+
+### 3.1 Preentrenado en COCO
+
+COCO no contiene maquinaria minera. Sobre el material, YOLO11s activa `truck` de forma
+consistente (confianza media 0.55–0.69) y nada más de forma relevante. Las clases `bus`
+y `train`, incluidas preventivamente en el mapeo inicial, **no se activan en ningún
+frame**; se eliminaron.
+
+El conteo agregado sugería éxito. La inspección visual del frame 120 de `video_02`,
+donde un CAEX y un bulldozer aparecen contiguos, mostró lo contrario:
+
+```
+imgsz=640,  conf>=0.20  ->  1 deteccion
+    truck  0.74  x=[138,759]  ancho=622px   <- ambas maquinas en una caja
+```
+
+Aumentar la resolución de inferencia a 1280 y 1920 no separa; produce cajas
+superpuestas e inestables.
+
+### 3.2 Open-vocabulary zero-shot
+
+YOLO-World (`yolov8s-worldv2`), siete conjuntos de prompts, `imgsz=1280`:
+
+| Prompts | Detecciones | Resultado |
+|---|---|---|
+| `["truck","bulldozer"]` | 1 | `truck` 0.56, 683 px — fusionada |
+| `["mining haul truck","bulldozer","excavator"]` | 1 | 0.34, 648 px — fusionada |
+| `["large yellow mining dump truck","yellow tracked bulldozer with blade"]` | 1 | 0.20, 693 px — fusionada |
+| `["bulldozer"]`, umbral 0.05 | **0** | — |
+| `["tracked bulldozer"]`, umbral 0.05 | **0** | — |
+| `["crawler dozer with blade"]`, umbral 0.05 | **0** | — |
+
+La confianza **baja** al aumentar la especificidad del prompt, que es lo contrario de
+lo esperado si el modelo entendiera la descripción.
+
+Bajando el umbral a 0.03 se comprobó que la descomposición correcta **existe** en el
+conjunto de propuestas pero pierde:
+
+```
+truck  0.562  x=[130,814]  ancho=683   <- fusionada, gana
+truck  0.141  x=[135,555]  ancho=420   <- el CAEX solo
+truck  0.089  x=[515,763]  ancho=248   <- el bulldozer
+```
+
+**Son dos fallos independientes, y la distinción decide si el enfoque es recuperable.**
+El primero es de ranking: la caja fusionada domina, y en principio se podría atacar
+ajustando umbrales. El segundo no lo es: sin competencia alguna y con el umbral casi en
+el suelo, tres redacciones distintas devuelven cero. Si el embedding de texto no
+coincide con la evidencia visual, ningún hiperparámetro lo hace activar.
+
+La causa de fondo es brecha de dominio: dos máquinas ocres, parcialmente superpuestas,
+sobre suelo ocre, con polvo y a media distancia. El vocabulario abierto condiciona las
+features mediante texto, pero la propuesta de región sigue dominada por el backbone
+visual.
+
+### 3.3 Fine-tuning sobre el dominio
+
+131 frames de entrenamiento anotados a mano, 40 de validación (`video_04` íntegro),
+partición **por video y no aleatoria**. Detalle en `docs/resultados_deteccion.md`.
+
+| Clase | Instancias (train) | mAP@0.5 | mAP@0.5:0.95 | Precisión | Recall |
+|---|---|---|---|---|---|
+| `caex` | 270 | **0.812** | 0.585 | 0.297 | **1.000** |
+| `bulldozer` | 33 | **0.306** | 0.188 | 0.464 | 0.455 |
+| global | | 0.559 | 0.387 | 0.381 | 0.727 |
+
+### 3.4 Veredicto del eje
+
+| | COCO | Zero-shot | Fine-tuned |
+|---|---|---|---|
+| Separa CAEX de bulldozer en cajas distintas | No | No | **Sí** |
+| Etiqueta correctamente la clase minoritaria | No | No | Débilmente (0.306) |
+| Datos etiquetados necesarios | 0 | 0 | 171 frames (~2 h) |
+| Recall sobre la clase mayoritaria | — | — | 1.000 |
+
+**El fine-tuning resolvió el bloqueo del pipeline aunque falló en la etiqueta.** La
+razón de ser del entrenamiento no era la clase, sino que el modelo base fusionaba las
+dos máquinas en una caja y eliminaba la magnitud que la proximidad necesita medir:
+
+```
+COCO:         1 caja de 622 px
+detector_v1:  285 px (bulldozer) + 549 px (CAEX)
+```
+
+Localización y clasificación se aprendieron de forma muy desigual. 33 instancias no
+alcanzan para una categoría visual nueva, pero entrenar con cajas separadas sí enseñó
+a **no fusionar máquinas adyacentes**, y el problema bloqueante era ese.
+
+**Un hiperparámetro pesó tanto como los pesos:** con el NMS por defecto de Ultralytics
+(iou=0.7) el modelo emite cuatro cajas solapadas; con el `iou=0.45` de
+`configs/method_1.yaml` quedan exactamente las dos correctas.
+
+---
+
+## 4. Eje 2 — Segmentación del pretil
+
+Reproducible con `python main.py --input data/raw --output output --method all`.
+
+Ambos métodos comparten CLAHE sobre luminancia, gradiente vertical positivo a escala
+gruesa, exclusión de las cajas de maquinaria y banda de búsqueda entre el horizonte y
+la rasante. **Difieren sólo en cuándo se impone el prior de continuidad:** el Método 1
+lo impone *durante* la búsqueda como restricción; el Método 2 *después*, mediante
+filtrado.
+
+### 4.1 Resultados agregados
+
+| | Método 1 (camino óptimo) | Método 2 (argmax + filtro) |
+|---|---|---|
+| **Jitter de la cresta** | **20.03 px** | 32.84 px |
+| Cobertura media | 93.6 % | 90.6 % |
+| Costo de la etapa | 55.9 ms/frame | **35.9 ms/frame** |
+| Pipeline completo | 11.6 fps | **14.6 fps** |
+| ms/frame (p95) | 102.3 | 81.7 |
+| Altura mediana | 0.48 m | 0.49 m |
+
+**El trade-off es explícito: el Método 1 reduce el jitter un 39 % a cambio de 1.56× el
+costo.** Ambas cifras son consecuencia directa de la formulación. La búsqueda de camino
+óptimo evalúa toda la rejilla con una restricción de continuidad, lo que cuesta más y
+produce un perfil que no puede saltar; el `argmax` decide cada columna en una operación
+trivial y el filtrado posterior sólo atenúa lo que ya se rompió.
+
+Las alturas medianas coinciden (0.48 vs 0.49 m) porque ambos alimentan el mismo
+estimador métrico. Lo que cambia no es el valor central sino su estabilidad.
+
+### 4.2 Desglose por condición lumínica, y una inversión
+
+| Condición | Jitter M1 (px) | Jitter M2 (px) | n |
+|---|---|---|---|
+| día | **17.87** | 39.12 | 424 |
+| crepúsculo | **28.00** | 59.89 | 94 |
+| noche | 22.10 | **17.58** | 473 |
+
+De día y en crepúsculo el Método 1 es 2.2× más estable. **De noche la relación se
+invierte.**
+
+La lectura no es que el `argmax` sea mejor de noche. Es que **el jitter mide
+estabilidad, no exactitud.** La inspección visual de los frames nocturnos muestra que
+la curva se engancha a los penachos de polvo iluminados por los faros, que son
+estructuras de gradiente muy fuerte y **espacialmente fijas** durante varios frames. Un
+`argmax` que se bloquea sobre el mismo máximo local frame tras frame produce jitter
+bajo y una respuesta consistentemente equivocada.
+
+Sin ground truth **no se puede distinguir «estable y correcto» de «estable y
+equivocado»**, y esa es la limitación central de este eje. Reportar el 17.58 nocturno
+como una victoria del Método 2 sería exactamente el error que este reporte trata de no
+cometer.
+
+### 4.3 La cobertura no es una métrica utilizable
+
+Se planificó como medida de calidad de la segmentación. Se probaron dos criterios de
+validación de las columnas del perfil:
+
+| Criterio | Cobertura medida |
+|---|---|
+| Percentil 55 de la respuesta del camino | 43 % en los 4 videos y las 3 condiciones |
+| 3 × la mediana de la banda de búsqueda | 92–95 % en los 4 videos y las 3 condiciones |
+
+**Ninguna de las dos describe el pretil.** La primera es el complemento del percentil
+elegido: un percentil selecciona por rango y por tanto acepta siempre la misma
+fracción. La segunda es alta y uniforme porque la respuesta de gradiente a escala
+gruesa es suave y no nula en casi todas las columnas.
+
+Que la cifra sea **insensible a la condición lumínica**, cuando el contraste varía dos
+órdenes de magnitud entre día y noche, es la señal de que mide el umbral y no la escena.
+Se reporta con esta advertencia en lugar de presentarse como calidad.
+
+---
+
+## 5. Eje 3 — Despliegue: CPU contra CUDA
+
+Medido dentro del contenedor, con el comando de referencia del enunciado.
+
+| Resolución | Sin `--gpus` (CPU) | Con `--gpus all` | Ganancia |
+|---|---|---|---|
+| 1280×720 | 8.2 fps | 15.4 fps | **1.9×** |
+| 1920×1080 | — | 1.5 fps | — |
+
+**La ganancia es de 1.9×, no de un orden de magnitud, y el desglose por etapa explica
+por qué.** Sobre `video_02` con GPU:
+
+| Etapa | ms/frame |
+|---|---|
+| pretil (NumPy/OpenCV, CPU) | 43.8 |
+| detección (CUDA) | 21.0 |
+| corte de toma | 1.6 |
+| luminancia | 1.4 |
+| renderizado del OSD | 1.1 |
+| proximidad y altura | < 0.1 |
+
+La GPU acelera únicamente la detección, que ya no es la etapa dominante. La
+segmentación del pretil cuesta el doble y corre en CPU, de modo que acota la ganancia
+total. Es la ley de Amdahl, y tiene dos consecuencias operativas:
+
+1. **El modo CPU es utilizable** —8 fps sobre clips de diez segundos—, lo que respalda
+   la decisión de degradar en lugar de exigir GPU (ADR 0001).
+2. **Optimizar el detector daría retorno marginal.** El trabajo rendidor sería llevar la
+   búsqueda de camino óptimo a GPU, o reducir su resolución de trabajo.
+
+Medir el desglose antes de optimizar evitó invertir esfuerzo en la etapa equivocada.
+
+---
+
+## 6. Rigor de la medición métrica
+
+La altura se obtiene sin calibración de cámara. El modelo está en
+`bermguard/analytics/height.py`; su propiedad útil es que **la focal se cancela**:
+
+```
+H = (y_base − y_cresta) · h / (y_base − y_horizonte)
+```
+
+de modo que la altura no depende del campo de visión asumido, que es el parámetro más
+incierto de la cadena. Sólo necesita el horizonte y la altura de montaje, y esta última
+se deriva del ancho nominal de un CAEX detectado.
+
+### 6.1 Una cota del error sin ground truth
+
+La altura medida, desglosada por condición lumínica:
+
+| Condición | Altura mediana M1 |
+|---|---|
+| día | 0.38 m |
+| crepúsculo | 0.47 m |
+| noche | 0.63 m |
+
+**Un pretil físico no cambia de altura al atardecer.** Toda esa dispersión es error de
+medición, y como la invariancia tiene que cumplirse por física, la dispersión observada
+es una **cota inferior del error del método** que no requiere ningún dato etiquetado:
+
+> ±26 % en torno a la mediana global de 0.49 m, sólo por el cambio de iluminación.
+
+Es una cota inferior porque un error sistemático común a las tres condiciones —el ancho
+nominal supuesto, por ejemplo— no aparecería en esta dispersión.
+
+### 6.2 El sesgo sistemático
+
+La normativa referencia la altura mínima del pretil al radio de rueda del equipo mayor,
+del orden de **1.5–2 m**. La medición da una mediana de **0.49 m**: baja por un factor
+próximo a 3.
+
+No se ajustó ningún parámetro para acercarla a la cifra esperada. Las hipótesis, sin
+resolver:
+
+1. **La base se detecta demasiado alta.** El estimador la busca donde la respuesta de
+   gradiente vuelve al nivel de fondo, y en un talud de pendiente suave ese punto puede
+   quedar muy por encima del pie real. Sería el sospechoso principal.
+2. **La estructura seguida no es el pretil normativo** sino el quiebre general de la
+   plataforma, que es un rasgo del terreno de menor relieve.
+3. **El ancho nominal supuesto es incorrecto** para esta maquinaria, lo que escalaría
+   todas las alturas por el mismo factor.
+
+Distinguirlas requiere ground truth, y por tanto queda fuera del alcance de esta
+entrega. **La medición absoluta no debe usarse para verificar cumplimiento normativo.**
+
+### 6.3 Dónde el sistema sí es confiable
+
+El error dominante es de escala, y una escala equivocada es **común a todas las
+mediciones de la misma toma**. Por lo tanto:
+
+- **Detectar que el pretil se degrada respecto a su propia línea base es confiable**,
+  porque un factor de escala constante se cancela en la comparación.
+- **Afirmar que el pretil mide 0.49 m no lo es.**
+
+Y ése es además el caso de uso operativo: a un supervisor le importa que la altura esté
+disminuyendo, no el valor absoluto con dos decimales.
+
+---
+
+## 7. Proximidad
+
+Con el detector especializado el módulo pasa a ser posible, porque hay dos entidades
+entre las que medir. Las alertas se cuentan como **escaladas de nivel** y no como frames
+en riesgo: un equipo diez segundos en zona crítica es un evento, no doscientas alertas.
+
+| Video | Alertas | Distancia mínima registrada | Mediana |
+|---|---|---|---|
+| `video_01` | 39 | 0.6 m | 17.4 m |
+| `video_02` | 12 | 2.9 m | 23.7 m |
+| `video_03` | 16 | 4.3 m | 19.4 m |
+| `video_04` | 13 | 0.9 m | 19.3 m |
+
+**Una parte de estas alertas es espuria, y las propias figuras lo delatan.** La matriz
+de distancias mínimas restringida a los ocho equipos con mayor permanencia no contiene
+ningún par por debajo de 14 m, mientras el mapa de dispersión muestra puntos en nivel
+crítico. Las dos cosas son correctas, y su desacuerdo localiza el problema: las alertas
+críticas provienen de identificadores **efímeros**, es decir de cajas duplicadas sobre
+una misma máquina.
+
+Es la consecuencia aguas abajo de la precisión 0.297 del detector. Se mitigó con dos
+mecanismos del tracker:
+
+| Mecanismo | Efecto medido |
+|---|---|
+| Confirmación tras 3 detecciones consecutivas | Elimina los falsos positivos aislados sobre polvo |
+| Supresión de duplicados por contención | Alertas 43→39 en `video_01`; distancia mínima 0.6→2.9 m en `video_02` |
+
+La supresión usa **intersección sobre el área menor y no IoU**: dos cajas desplazadas
+sobre el mismo camión tienen IoU moderado —del orden de 0.35, indistinguible de dos
+equipos reales— y contención alta.
+
+Mitigación parcial, no solución: `video_01` conserva un mínimo de 0.6 m. La causa raíz
+es la precisión del detector, y por tanto un problema de datos.
+
+---
+
+## 8. Limitaciones y trabajo futuro
+
+En orden de impacto sobre lo que este reporte no pudo medir o resolver.
+
+**1. No hay ground truth del pretil.** Es la limitación central. Sin él no se mide
+exactitud, sólo estabilidad y costo, y la inversión de jitter en las escenas nocturnas
+queda sin resolver. Anotar el perfil de la cresta en unos 30 frames estratificados
+permitiría calcular el error absoluto de posición y decidir el eje de segmentación con
+exactitud y no sólo con estabilidad.
+
+**2. La clase `bulldozer` está aprendida pero es frágil** (mAP 0.306, recall 0.455). La
+causa es de datos: 33 instancias frente a 270. La vía más eficiente no es un dataset
+externo —se evaluaron tres y se descartaron por brecha de dominio, ver ADR 0004— sino
+**copy-paste augmentation** con las 44 máscaras poligonales ya anotadas: son del dominio
+exacto por construcción, y permitirían multiplicar la clase minoritaria sin anotar más.
+
+**3. El detector sobre-detecta** (precisión 0.297 con recall 1.000). Subir el umbral de
+confianza costaría el recall que la clase minoritaria no tiene margen de perder; la vía
+correcta es endurecer la persistencia exigida en el tracker y medir el efecto sobre las
+alertas espurias.
+
+**4. El sesgo sistemático de la altura** (factor ~3) tiene tres hipótesis planteadas en
+la sección 6.2 y ninguna descartada.
+
+**5. Falta el segmentador neural del pretil.** Con SAM2 promptado por el camino óptimo
+del Método 1 —los métodos apoyándose uno en otro— el eje del benchmark pasaría de
+comparar dos formulaciones clásicas a comparar prior geométrico contra representación
+aprendida, que es el contraste que el enunciado propone.
+
+**6. La segmentación del pretil es el cuello de botella** (43.8 ms/frame en 720p,
+93.6 ms en 1080p). Llevar la búsqueda de camino óptimo a GPU, o ejecutarla a resolución
+reducida e interpolar, es la única optimización con retorno real.
+
+**7. Exportación a ONNX Runtime** y medición del speedup frente a PyTorch en FP32 y
+FP16, que el enunciado valora y que no se llegó a medir.
+
+**8. Los umbrales están calibrados sobre cuatro videos.** Los cortes de clasificación
+lumínica, el umbral de detección de cortes y el campo de visión asumido se ajustaron
+sobre el material de muestra. El conjunto de evaluación es ciego: su generalización es un
+supuesto declarado, no un hecho verificado. Todos son configurables en `configs/`.
+
+**9. Anotador único, sin acuerdo entre anotadores.** Las métricas de detección arrastran
+una incertidumbre propia que no se ha cuantificado.

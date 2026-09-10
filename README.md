@@ -30,7 +30,7 @@ Ver [ADR 0001](docs/adr/0001-cuda-como-stack-de-aceleracion.md) para el razonami
 |---|---|---|
 | `--input` | ruta | Directorio con los videos. Los archivos que no son video se ignoran |
 | `--output` | ruta | Directorio de artefactos. Se crea si no existe |
-| `--method` | `1`, `2`, `all` | Método a ejecutar. `all` corre todos sobre cada video |
+| `--method` | `1`, `2`, `all` | `1` camino óptimo, `2` línea base por argmax, `all` ambos |
 | `--device` | `auto`, `cuda`, `cpu` | Por defecto `auto` |
 | `--max-frames` | entero | Tope de frames por video, para pruebas rápidas |
 | `--log-level` | `DEBUG`…`ERROR` | Por defecto `INFO` |
@@ -106,6 +106,8 @@ Documentos de respaldo:
 - [`docs/resultados_deteccion.md`](docs/resultados_deteccion.md) — resultados del detector
   especializado, incluido lo que no funcionó
 - [`docs/guia_anotacion.md`](docs/guia_anotacion.md) — protocolo de anotación
+- [`reporte_benchmark.md`](reporte_benchmark.md) — comparación de los métodos, con las
+  métricas que resultaron no medir lo que se esperaba
 
 ### Ambigüedad del enunciado, resuelta y declarada
 
@@ -179,6 +181,17 @@ potencial.
 Ambos síntomas tienen la misma causa, y es de datos: 33 instancias de bulldozer en
 entrenamiento frente a 270 de CAEX. El análisis completo está en
 [`docs/resultados_deteccion.md`](docs/resultados_deteccion.md).
+
+**La segmentación del pretil se mide por estabilidad, no por exactitud.** No hay ground
+truth anotado del perfil, de modo que el jitter temporal y el costo son comparables entre
+métodos pero el error absoluto de la cresta no se conoce. Es la limitación central del
+`reporte_benchmark.md`.
+
+**La altura absoluta tiene un sesgo sistemático de factor ~3** — mediana medida 0.49 m
+frente a los 1.5–2 m que referencia la normativa — y una dispersión de ±26 % atribuible
+sólo al cambio de iluminación. **No debe usarse para verificar cumplimiento normativo.**
+En términos relativos, detectar que el pretil se degrada respecto a su propia línea base
+sí es confiable, porque un factor de escala constante se cancela en la comparación.
 
 **El pretil no se delinea completo.** La cobertura media ronda el 60 % de las columnas. El
 material presenta contraste bajo entre el banco de tierra y el suelo circundante, y textura de

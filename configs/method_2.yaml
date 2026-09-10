@@ -1,16 +1,25 @@
-# Metodo 2 - Representacion aprendida
+# Metodo 2 - Linea base: maximo de gradiente por columna
 #
-# Segmentacion neural del pretil, para contrastar contra el prior geometrico del
-# metodo 1. El eje del benchmark es real: modelo explicito y auditable frente a
-# representacion aprendida de proposito general.
+# El enfoque convencional para un borde estructural horizontal: derivar, tomar el
+# maximo por columna, filtrar el perfil. Se implemento primero, se midio, y su
+# fracaso motivo la formulacion por camino optimo del metodo 1.
 #
-# Ver docs/adr/0002 (eleccion del detector) y docs/adr/0003 (tomas y luminancia).
+# Se conserva como linea base medible: sin ella, "el camino optimo es mejor" seria
+# una opinion en vez de un 39 % menos de jitter a 1.56x el costo. El eje del
+# benchmark es donde se impone el prior de continuidad — durante la busqueda o
+# despues, mediante filtrado.
+#
+# Comparte con el metodo 1 preprocesado, exclusion de maquinaria y banda de
+# busqueda, para que la comparacion aisle la formulacion.
+#
+# Ver reporte_benchmark.md seccion 4, y docs/adr/0006.
 
 method: 2
-name: "Representacion aprendida"
+name: "Linea base por argmax"
 description: >
-  Segmentacion neural del pretil con propagacion temporal. Mascaras continuas y
-  robustas a cambios de iluminacion, a mayor costo computacional.
+  Linea base de segmentacion del pretil por maximo de gradiente por columna con
+  filtrado posterior. Mas rapida que el camino optimo y sustancialmente menos
+  estable.
 
 detector:
   weights: weights/detector_v1.pt
