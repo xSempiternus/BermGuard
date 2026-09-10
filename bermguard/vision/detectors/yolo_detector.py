@@ -18,6 +18,17 @@ from bermguard.core.types import BBox, Detection, ImageBGR, VehicleClass
 
 logger = logging.getLogger(__name__)
 
+DOMAIN_CLASS_MAP: Mapping[int, VehicleClass] = {
+    0: VehicleClass.CAEX,
+    1: VehicleClass.BULLDOZER,
+}
+"""Mapeo del detector especializado, entrenado según el ADR 0002.
+
+Coincide con el orden de clases del dataset (ver ``docs/guia_anotacion.md``), y por
+eso es el mapeo por defecto: los pesos que entrega el proyecto son los del modelo
+del dominio, no los de estantería.
+"""
+
 DEFAULT_COCO_CLASS_MAP: Mapping[int, VehicleClass] = {
     7: VehicleClass.CAEX,  # "truck" en COCO
 }
@@ -71,12 +82,16 @@ class YoloDetector:
             half_precision: Usar FP16. Se ignora en CPU, donde es más lento. La GPU
                 de desarrollo es Ampere y tiene Tensor Cores, así que media
                 precisión aporta rendimiento real y no sólo ahorro de memoria.
-            class_map: Reemplaza a :data:`DEFAULT_COCO_CLASS_MAP`.
+            class_map: Reemplaza a :data:`DOMAIN_CLASS_MAP`. **Tiene que
+                corresponder a los pesos.** Un mapeo con índices que el modelo no
+                posee filtra todas las detecciones y el pipeline produce artefactos
+                vacíos sin lanzar ningún error, así que el constructor lo valida.
 
         Raises:
-            ModelLoadError: Si el checkpoint no se puede cargar.
+            ModelLoadError: Si el checkpoint no se puede cargar, o si el mapeo de
+                clases no corresponde a las que el modelo declara.
         """
-        self._class_map = dict(class_map or DEFAULT_COCO_CLASS_MAP)
+        self._class_map = dict(class_map or DOMAIN_CLASS_MAP)
         self._confidence = confidence
         self._iou = iou
         self._image_size = image_size
@@ -99,6 +114,21 @@ class YoloDetector:
             raise ModelLoadError(
                 f"No se pudieron cargar los pesos '{self._weights}' en el dispositivo '{device}'"
             ) from exc
+
+        # Validacion que evita un fallo silencioso. Al sustituir los pesos COCO por
+        # los del dominio, el mapeo heredado apuntaba a la clase 7 ("truck" en COCO)
+        # y el modelo especializado solo tiene las clases 0 y 1: el filtro descartaba
+        # absolutamente todo y el pipeline seguia produciendo artefactos, vacios, sin
+        # una sola excepcion. Fallar al construir es mucho mejor que eso.
+        disponibles = set(self._model.names)
+        desconocidas = set(self._class_map) - disponibles
+        if desconocidas:
+            raise ModelLoadError(
+                f"El mapeo de clases referencia indices {sorted(desconocidas)} que "
+                f"'{Path(self._weights).name}' no declara. El modelo expone "
+                f"{ {i: n for i, n in self._model.names.items()} }. "
+                f"Revisar 'detector.class_map' en configs/."
+            )
 
         logger.info(
             "Detector listo: %s en %s (fp16=%s, imgsz=%d, conf=%.2f)",

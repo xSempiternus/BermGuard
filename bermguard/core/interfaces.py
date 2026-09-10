@@ -82,9 +82,7 @@ class IBermSegmenter(Protocol):
     @property
     def name(self) -> str: ...
 
-    def segment(
-        self, frame: ImageBGR, detections: Sequence[Detection] = ()
-    ) -> BermPixels | None:
+    def segment(self, frame: ImageBGR, detections: Sequence[Detection] = ()) -> BermPixels | None:
         """Devuelve cresta y base del pretil por columna, o ``None`` si no hay.
 
         Args:

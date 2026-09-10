@@ -91,8 +91,39 @@ paramétrico rígido descartaría como outliers precisamente las variaciones que
 
 ## Consecuencias
 
-- La cobertura medida sobre el material de muestra ronda el 60 % de las columnas. El método
-  no delinea el pretil completo, y eso se reporta como tal.
+### La cobertura no es una métrica utilizable con este método
+
+Es el hallazgo más incómodo y conviene declararlo antes que nada, porque la cobertura era la
+métrica prevista para cuantificar la calidad de la segmentación sin ground truth.
+
+El camino óptimo recorre **todas** las columnas por construcción, de modo que la cobertura
+depende enteramente del criterio con que se validan sus columnas. Y se probaron dos:
+
+| Criterio de validación | Cobertura medida |
+|---|---|
+| Percentil 55 de la respuesta del propio camino | 43 % en los 4 videos y las 3 condiciones |
+| 3 × la mediana de la banda de búsqueda | 92–95 % en los 4 videos y las 3 condiciones |
+
+**Ninguna de las dos cifras describe el pretil.** La primera es el complemento del percentil
+elegido, y sale idéntica porque un percentil selecciona por rango: siempre acepta la misma
+fracción. La segunda es alta y uniforme porque la respuesta de gradiente a escala gruesa es
+suave y no nula en casi todas las columnas, de modo que cualquier umbral referido al ruido las
+acepta.
+
+Que el número sea insensible a la condición lumínica —cuando el contraste varía dos órdenes de
+magnitud entre día y noche— es la señal de que mide el umbral y no la escena.
+
+Se conserva el criterio referido al ruido, por ser el más defendible de los dos, y **la
+cobertura se reporta con esta advertencia explícita en lugar de presentarse como medida de
+calidad**. La métrica que sí sería informativa sin ground truth es el **jitter temporal** de la
+cresta —la desviación estándar de su variación entre frames consecutivos—, que es además lo que
+el enunciado penaliza al hablar de parpadeo. Queda pendiente.
+
+### Otras consecuencias
+
+- El método no delinea el pretil completo. En las escenas nocturnas la inspección visual
+  muestra que la curva se engancha a penachos de polvo iluminados por los faros, y eso no lo
+  refleja ninguna de las dos cifras de cobertura.
 - El coste es de 57 ms por frame en 720p y 120 ms en 1080p, comparable o superior al de la
   inferencia del detector. Es el precio de una búsqueda global sobre toda la rejilla.
 - La calidad depende de que haya maquinaria detectada. Sin ella, la banda de búsqueda es un

@@ -68,7 +68,7 @@ class ClassicalBermSegmenter:
         clahe_clip: float = 2.5,
         blur_sigma: float = 6.0,
         max_step_px: int = 3,
-        response_percentile: float = 55.0,
+        noise_multiple: float = 3.0,
         smooth_window: int = 31,
         temporal_alpha: float = 0.3,
         sky_variance_threshold: float = 6.0,
@@ -86,10 +86,14 @@ class ClassicalBermSegmenter:
                 contiguas. Es el prior de continuidad expresado como restricción.
                 Valores altos permiten seguir pretiles muy inclinados a costa de
                 dejar entrar saltos hacia estructuras vecinas.
-            response_percentile: Percentil de la respuesta a lo largo del camino
-                por debajo del cual una columna se declara sin pretil. Umbral
-                relativo y no absoluto, porque el contraste varía dos órdenes de
-                magnitud entre día y noche.
+            noise_multiple: Cuántas veces el suelo de ruido de la banda debe superar
+                la respuesta del camino para aceptar una columna. Se mide contra la
+                mediana de la banda y no como percentil del propio camino: un
+                percentil produce siempre la misma cobertura por construcción, y por
+                tanto una métrica que describe el umbral elegido en lugar de la
+                escena. Referido al ruido de cada frame, el criterio sigue siendo
+                robusto a que el contraste varíe dos órdenes de magnitud entre día y
+                noche.
             smooth_window: Ventana del filtro Savitzky-Golay sobre el perfil.
                 Savitzky-Golay y no media móvil: ajusta un polinomio local, de modo
                 que preserva la amplitud y la posición de las variaciones reales
@@ -110,7 +114,7 @@ class ClassicalBermSegmenter:
         self._clahe = cv2.createCLAHE(clipLimit=clahe_clip, tileGridSize=(8, 8))
         self._blur_sigma = blur_sigma
         self._max_step = max_step_px
-        self._response_percentile = response_percentile
+        self._noise_multiple = noise_multiple
         self._smooth_window = smooth_window
         self._alpha = temporal_alpha
         self._sky_threshold = sky_variance_threshold
@@ -128,9 +132,7 @@ class ClassicalBermSegmenter:
 
     # --- Contrato -------------------------------------------------------------
 
-    def segment(
-        self, frame: ImageBGR, detections: Sequence[Detection] = ()
-    ) -> BermPixels | None:
+    def segment(self, frame: ImageBGR, detections: Sequence[Detection] = ()) -> BermPixels | None:
         alto, ancho = frame.shape[:2]
 
         realzado = self._realzar(frame)
@@ -150,12 +152,20 @@ class ClassicalBermSegmenter:
         cresta_local = self._camino_de_cresta(banda / pico)
         fuerza = banda[cresta_local, np.arange(ancho)]
 
-        # Umbral relativo sobre la respuesta a lo largo del camino: donde el camino
-        # pasa por zonas sin senal, no hay pretil que reportar. El camino existe
-        # siempre —es un optimo global— y esta validacion es lo que impide que
-        # devuelva una linea inventada sobre suelo liso.
-        corte = float(np.percentile(fuerza, self._response_percentile))
-        valida = fuerza > max(corte, pico * 0.05)
+        # Validacion del camino. El camino existe siempre —es un optimo global— asi
+        # que sin este filtro el metodo devolveria una linea de aspecto convincente
+        # incluso sobre suelo liso.
+        #
+        # El umbral se mide contra el **suelo de ruido de la banda** y no como
+        # percentil de la propia respuesta del camino. Una version previa usaba el
+        # percentil y producia siempre la misma cobertura —el 45 % complementario—
+        # con independencia de la escena: la cifra describia el percentil elegido, no
+        # el pretil. Un multiplo de la mediana de la banda si es informativo, porque
+        # una escena sin estructura horizontal da cobertura baja y una con pretil
+        # nitido da cobertura alta.
+        suelo_de_ruido = float(np.median(banda))
+        corte = max(self._noise_multiple * suelo_de_ruido, pico * 0.05)
+        valida = fuerza > corte
         if valida.sum() < ancho * 0.1:
             return None
 
@@ -192,9 +202,7 @@ class ClassicalBermSegmenter:
         gy = cv2.Scharr(suave, cv2.CV_32F, 0, 1)
         return np.maximum(gy, 0.0)
 
-    def _anular_maquinaria(
-        self, respuesta: np.ndarray, detections: Sequence[Detection]
-    ) -> None:
+    def _anular_maquinaria(self, respuesta: np.ndarray, detections: Sequence[Detection]) -> None:
         """Pone a cero la respuesta dentro de las cajas de maquinaria, in situ."""
         alto, ancho = respuesta.shape
         d = self._box_dilation
@@ -255,9 +263,7 @@ class ClassicalBermSegmenter:
         acumulado = np.empty_like(banda)
         acumulado[:, 0] = banda[:, 0]
         for x in range(1, ancho):
-            mejor_previo = maximum_filter1d(
-                acumulado[:, x - 1], size=tam_ventana, mode="nearest"
-            )
+            mejor_previo = maximum_filter1d(acumulado[:, x - 1], size=tam_ventana, mode="nearest")
             acumulado[:, x] = banda[:, x] + mejor_previo
 
         camino = np.empty(ancho, dtype=np.int64)
@@ -285,12 +291,20 @@ class ClassicalBermSegmenter:
         return salida
 
     def _suavizar_temporal(self, cresta: FloatArray) -> FloatArray:
-        """Suavizado exponencial contra el frame anterior.
+        """Suavizado exponencial contra el frame anterior, sólo donde hay medición.
 
-        Es el mecanismo antiparpadeo del perfil. Las columnas con dato en sólo uno
-        de los dos frames se toman del que lo tenga, en lugar de propagar ``NaN``:
-        perder una columna por un frame ruidoso empeoraría la cobertura sin ganar
-        precisión.
+        Es el mecanismo antiparpadeo del perfil: una columna medida en ambos frames
+        se promedia con peso ``alpha`` sobre el actual, de modo que el pretil —que
+        físicamente cambia lentísimo— no oscila al ritmo del ruido de medición.
+
+        **Una columna sin medición en este frame se reporta como ``NaN``, no se
+        hereda del anterior.** Una versión previa sí heredaba, con el argumento de
+        no perder cobertura por un frame ruidoso, y el efecto medido fue el
+        contrario: los valores heredados nunca expiraban, así que una estimación
+        mala se propagaba indefinidamente y la cobertura reportada subía hasta el
+        100 % sin que hubiera medición real detrás. Un hueco declarado informa; un
+        hueco rellenado con el pasado es una cifra inventada que además ensucia la
+        curva de altura.
         """
         if self._crest_previa is None or self._crest_previa.shape != cresta.shape:
             self._crest_previa = cresta.copy()
@@ -301,15 +315,13 @@ class ClassicalBermSegmenter:
         mezcla = np.where(
             ambos,
             self._alpha * cresta + (1.0 - self._alpha) * previa,
-            np.where(np.isfinite(cresta), cresta, previa),
+            cresta,
         ).astype(np.float32)
 
         self._crest_previa = mezcla
         return mezcla
 
-    def _estimar_base(
-        self, respuesta: np.ndarray, cresta: FloatArray, y_max: int
-    ) -> FloatArray:
+    def _estimar_base(self, respuesta: np.ndarray, cresta: FloatArray, y_max: int) -> FloatArray:
         """Localiza el pie del pretil descendiendo desde la cresta.
 
         La base es donde la cara del pretil se encuentra con la rasante: bajando
@@ -340,11 +352,7 @@ class ClassicalBermSegmenter:
         pico = respuesta[np.clip(indices, 0, alto - 1), np.arange(ancho)]
 
         umbral = fondo + 0.5 * (pico - fondo)
-        cae = (
-            (respuesta < umbral[None, :])
-            & (filas > cresta_segura[None, :])
-            & (filas < fin)
-        )
+        cae = (respuesta < umbral[None, :]) & (filas > cresta_segura[None, :]) & (filas < fin)
 
         primero = cae.argmax(axis=0).astype(np.float32)
         hay_cruce = cae.any(axis=0) & valida & (pico > fondo)

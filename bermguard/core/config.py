@@ -57,6 +57,22 @@ class ShotConfig(_Base):
     generen una toma espuria y disparen un reinicio de estado innecesario."""
 
 
+class TrackerConfig(_Base):
+    high_confidence: float = Field(0.45, ge=0.0, le=1.0)
+    min_hits: int = Field(3, ge=1)
+    """Detecciones necesarias para confirmar un track.
+
+    Es el filtro de falsos positivos: el detector tiene precision 0.297, y un falso
+    positivo aislado no persiste entre frames. Exigir persistencia lo descarta sin
+    tocar el umbral de confianza, que es lo unico que la clase minoritaria no puede
+    permitirse (ver docs/resultados_deteccion.md)."""
+
+    max_age: int = Field(8, ge=1)
+    iou_high: float = Field(0.30, ge=0.0, le=1.0)
+    iou_low: float = Field(0.15, ge=0.0, le=1.0)
+    velocity_smoothing: float = Field(0.5, gt=0.0, le=1.0)
+
+
 class ProximityConfig(_Base):
     caution_m: float = Field(20.0, gt=0.0)
     critical_m: float = Field(10.0, gt=0.0)
@@ -79,6 +95,7 @@ class PipelineConfig(_Base):
     description: str = ""
 
     detector: DetectorConfig = DetectorConfig()
+    tracker: TrackerConfig = TrackerConfig()
     lighting: LightingConfig = LightingConfig()
     shots: ShotConfig = ShotConfig()
     proximity: ProximityConfig = ProximityConfig()
@@ -89,6 +106,12 @@ class PipelineConfig(_Base):
             raise ValueError(
                 f"lighting.night_max ({self.lighting.night_max}) debe ser menor que "
                 f"lighting.day_min ({self.lighting.day_min})"
+            )
+        if self.tracker.iou_low > self.tracker.iou_high:
+            raise ValueError(
+                f"tracker.iou_low ({self.tracker.iou_low}) no puede exceder "
+                f"tracker.iou_high ({self.tracker.iou_high}): la segunda ronda de "
+                f"asociacion debe ser mas permisiva, no menos"
             )
         if self.proximity.critical_m >= self.proximity.caution_m:
             raise ValueError(
