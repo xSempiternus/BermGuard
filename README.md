@@ -121,6 +121,32 @@ modos, con CUDA como camino declarado y la degradación a CPU como seguro.
 
 ---
 
+## Rendimiento medido
+
+Ejecutando el comando de referencia dentro del contenedor, sobre el material de muestra.
+Hardware: RTX 3050 Ti Laptop (4 GB) e Intel de portátil.
+
+| Resolución | Sin `--gpus` (CPU) | Con `--gpus all` | Ganancia |
+|---|---|---|---|
+| 1280×720 | 8.2 fps | 15.4 fps | 1.9× |
+| 1920×1080 | — | 1.5 fps | — |
+
+**La GPU sólo acelera el detector.** La segmentación del pretil se ejecuta en NumPy y OpenCV
+sobre CPU, y a 720p ya cuesta más que la inferencia. El resultado es que la aceleración
+extremo a extremo se queda en 1.9×, muy por debajo del orden de magnitud que suele asumirse:
+la etapa que no se acelera acota la ganancia total.
+
+Tiene dos consecuencias prácticas. La primera es que **el modo CPU es perfectamente utilizable**
+—8 fps sobre clips de diez segundos—, lo que respalda la decisión del ADR 0001 de degradar en
+vez de exigir GPU. La segunda es que optimizar el detector sin tocar la rama de terreno daría
+un retorno marginal; el trabajo rendidor sería llevar la búsqueda de camino óptimo a GPU o
+reducir su resolución de trabajo.
+
+La imagen pesa 15.7 GB, dominada por la base CUDA y las librerías de NVIDIA que arrastra
+PyTorch. Es el costo de un despliegue con GPU disponible sin descargas en tiempo de ejecución.
+
+---
+
 ## Estado y limitaciones
 
 Esta sección declara qué funciona, qué no, y por qué. Es deliberadamente explícita.
