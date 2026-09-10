@@ -156,7 +156,8 @@ Esta sección declara qué funciona, qué no, y por qué. Es deliberadamente exp
 - **Ejecución extremo a extremo** sobre un directorio arbitrario, con resolución y tasa de
   frames heterogéneas. Un video ilegible se registra en `run_metadata.json` y no interrumpe
   el lote.
-- **Detección de CAEX** con recall de 0.97 sobre el conjunto de validación.
+- **Detección de CAEX** con recall de 1.000 y mAP@0.5 de 0.812 sobre el conjunto de
+  validación.
 - **Separación de máquinas contiguas** en cajas independientes, que es la condición necesaria
   para medir proximidad. El modelo preentrenado las fusionaba en una sola caja.
 - **Segmentación del pretil** con cobertura en torno al 60 % de las columnas, con continuidad
@@ -165,11 +166,18 @@ Esta sección declara qué funciona, qué no, y por qué. Es deliberadamente exp
 
 ### No funciona, y por qué
 
-**La clasificación `caex` / `bulldozer` no es utilizable.** El detector emite toda detección
-como `caex`; nunca predice la clase minoritaria. La causa está identificada y es de datos: 33
-instancias de bulldozer en entrenamiento frente a 270 de CAEX. Las etiquetas de clase en el OSD
-y en los artefactos no deben interpretarse como identificación de tipo de equipo. El análisis
-completo, con la matriz de confusión, está en
+**La clase `bulldozer` está aprendida pero es frágil.** mAP@0.5 de 0.306 y recall de 0.455,
+frente a 0.812 y 1.000 para `caex`. Al umbral de operación de 0.25 la clase minoritaria casi no
+se emite, de modo que en la práctica el OSD etiqueta toda máquina como `caex`. **Las etiquetas
+de clase de los artefactos no deben interpretarse como identificación de tipo de equipo.**
+
+**El detector sobre-detecta.** La precisión sobre `caex` es de 0.297 con recall 1.000: encuentra
+todos los camiones, pero cerca del 70 % de sus detecciones no corresponde a ninguno. Cada falso
+positivo será una entidad fantasma para el módulo de proximidad, y por tanto una alerta espuria
+potencial.
+
+Ambos síntomas tienen la misma causa, y es de datos: 33 instancias de bulldozer en
+entrenamiento frente a 270 de CAEX. El análisis completo está en
 [`docs/resultados_deteccion.md`](docs/resultados_deteccion.md).
 
 **El pretil no se delinea completo.** La cobertura media ronda el 60 % de las columnas. El

@@ -1,0 +1,24 @@
+{
+  "pesos": "weights/detector_v1.pt",
+  "dataset": "data/dataset/data.yaml",
+  "global": {
+    "mAP50": 0.5588,
+    "mAP50-95": 0.3866,
+    "precision": 0.3805,
+    "recall": 0.7273
+  },
+  "por_clase": {
+    "caex": {
+      "mAP50": 0.8122,
+      "mAP50-95": 0.5854,
+      "precision": 0.2971,
+      "recall": 1.0
+    },
+    "bulldozer": {
+      "mAP50": 0.3055,
+      "mAP50-95": 0.1878,
+      "precision": 0.4638,
+      "recall": 0.4545
+    }
+  }
+}

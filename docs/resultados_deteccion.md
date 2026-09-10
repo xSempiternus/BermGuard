@@ -60,19 +60,52 @@ entrenamiento.
 
 ## 4. El resultado que el promedio esconde
 
-La matriz de confusión normalizada sobre el conjunto de validación:
+El desglose por clase sobre el conjunto de validación:
 
-| | predicho `caex` | predicho `bulldozer` | no detectado |
-|---|---|---|---|
-| **`caex` real** | 0.97 | 0.00 | 0.03 |
-| **`bulldozer` real** | 0.45 | **0.00** | 0.55 |
+| Clase | mAP@0.5 | mAP@0.5:0.95 | Precisión | Recall |
+|---|---|---|---|---|
+| `caex` | 0.812 | 0.585 | 0.297 | **1.000** |
+| `bulldozer` | **0.306** | 0.188 | 0.464 | 0.455 |
 
-**El modelo no predice la clase `bulldozer` en ninguna ocasión.** La fila entera está vacía.
-Un bulldozer real se etiqueta como `caex` el 45 % de las veces y se pierde el 55 % restante.
+**El mAP global de 0.559 describe dos comportamientos muy distintos promediados.** La clase
+mayoritaria alcanza 0.812, un valor utilizable; la minoritaria se queda en 0.306, que no lo es.
+Reportar sólo la cifra global habría ocultado exactamente el problema que este entrenamiento
+existía para resolver.
 
-El mAP global de 0.559 es por tanto engañoso: describe un sistema que resuelve bien una clase
-e ignora por completo la otra. Reportar sólo esa cifra habría ocultado exactamente el problema
-que este entrenamiento existía para resolver.
+### Una discrepancia que conviene explicar
+
+La matriz de confusión que genera el entrenamiento
+(`docs/entrenamiento/confusion_matrix_normalized.png`) muestra la fila de `bulldozer`
+completamente vacía, como si el modelo nunca predijera esa clase. El mAP de 0.306 dice que sí
+la predice.
+
+Ambas cosas son ciertas y la diferencia está en el umbral. La matriz de confusión se calcula a
+un **umbral de confianza fijo**, mientras el mAP integra la curva precisión-recall **sobre todos
+los umbrales**. La lectura conjunta es que el modelo emite predicciones de `bulldozer`, pero
+casi todas por debajo del umbral de operación: a 0.25 —el valor que fija
+`configs/method_1.yaml`— prácticamente desaparecen.
+
+Es una distinción con consecuencia práctica: la clase está aprendida, aunque débilmente, y no
+ausente. Bajar el umbral la haría aparecer, a costa de los falsos positivos que se describen
+abajo. Y es un recordatorio de que una métrica agregada y una matriz de confusión no responden
+la misma pregunta.
+
+### El problema de precisión, que no estaba previsto
+
+`caex` tiene **recall 1.000 con precisión 0.297**: el modelo encuentra todos los camiones del
+conjunto de validación, pero cerca del 70 % de sus detecciones no corresponde a ninguno.
+
+Sobre-detecta. Es coherente con lo observado al inspeccionar frames sueltos: con el umbral de
+NMS por defecto de Ultralytics (0.7) el modelo emite cuatro cajas solapadas sobre la misma
+escena. El `iou=0.45` de la configuración recorta buena parte de esa duplicación, pero la
+precisión medida indica que quedan falsos positivos sobre terreno y polvo.
+
+Tiene una consecuencia aguas abajo que hay que declarar: **cada falso positivo es una entidad
+fantasma para el módulo de proximidad**, y por tanto una fuente de alertas espurias. Un
+sistema de seguridad que alerta sin causa produce fatiga de alarma, que es el mismo problema
+que la histéresis existe para evitar. Mitigarlo pasa por subir el umbral de confianza —a costa
+del recall de `bulldozer`, ya frágil— o por exigir persistencia temporal en el tracker antes de
+considerar un track como equipo real.
 
 ## 5. Y sin embargo, el entrenamiento resolvió el bloqueo
 
@@ -92,24 +125,40 @@ necesaria para medir distancia entre equipos.
 
 La interpretación es que el entrenamiento sobre datos del dominio, con cajas anotadas
 separadas, enseñó al modelo a **no fusionar máquinas adyacentes**, aunque 33 instancias no
-alcanzaran para aprender una categoría visual nueva. Localización y clasificación se
-aprendieron de forma desigual, y el problema bloqueante era el primero.
+alcanzaran para aprender una categoría visual sólida. **Localización y clasificación se
+aprendieron de forma muy desigual**, y el problema bloqueante era el primero: la separación en
+entidades independientes es lo que el módulo de proximidad necesita, y la etiqueta correcta es
+deseable pero no imprescindible para medir una distancia.
 
-Una observación práctica: con el umbral de NMS por defecto de Ultralytics (0.7) el modelo emite
-cuatro cajas solapadas sobre la misma escena. Con el `iou=0.45` que fija `configs/method_1.yaml`
-quedan exactamente las dos correctas. El valor de configuración importa tanto como los pesos.
+Nótese que en este frame ambas cajas salen como `caex`, incluida la del bulldozer. Es
+consistente con la sección 4: al umbral de operación de 0.25 la clase minoritaria casi no se
+emite.
 
 ## 6. Estado y limitaciones declaradas
 
-**Lo que funciona.** Detección de CAEX con recall de 0.97 sobre validación. Separación de
-máquinas contiguas en cajas independientes.
+**Lo que funciona.** Recall perfecto sobre `caex` en el conjunto de validación (1.000) y
+mAP@0.5 de 0.812 para esa clase. Separación de máquinas contiguas en cajas independientes,
+que era el bloqueo del pipeline.
 
-**Lo que no.** La clasificación `caex` / `bulldozer` no es utilizable: toda detección se emite
-como `caex`. El OSD y los artefactos reflejan esa etiqueta, y no debe interpretarse como una
-identificación de tipo de equipo.
+**Lo que no, y en qué grado.**
+
+- **La clase `bulldozer` está aprendida pero es frágil**: mAP@0.5 de 0.306, recall 0.455. Al
+  umbral de operación de 0.25 casi no se emite, de modo que en la práctica el OSD etiqueta
+  toda máquina como `caex`. Las etiquetas de clase de los artefactos **no deben interpretarse
+  como identificación de tipo de equipo**.
+- **La precisión sobre `caex` es baja** (0.297): el modelo sobre-detecta, y cada falso positivo
+  se convierte en una entidad fantasma para el módulo de proximidad y por tanto en una alerta
+  espuria potencial.
 
 **Causa identificada.** 33 instancias de bulldozer en entrenamiento, frente a 270 de CAEX. Es
-un problema de datos, no de arquitectura ni de hiperparámetros.
+un problema de datos, no de arquitectura ni de hiperparámetros. El desbalance explica ambos
+síntomas: la clase minoritaria se aprende mal, y el modelo aprende a apostar por la mayoritaria
+ante la duda, lo que infla el recall a costa de la precisión.
+
+**Nota sobre el conjunto exportado.** La validación advirtió `len(segments)=18, len(boxes)=50`:
+dieciocho anotaciones se hicieron con herramienta de polígono en lugar de caja. Ultralytics
+descarta los polígonos y usa las cajas envolventes, de modo que no hay pérdida de información
+para detección, pero conviene homogeneizar la herramienta de anotación si el conjunto se amplía.
 
 **Camino de corrección, en orden de coste-beneficio:**
 
