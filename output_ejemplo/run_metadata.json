@@ -1,0 +1,21 @@
+{
+  "command": "main.py --input data/raw --output C:/Users/nikoa/AppData/Local/Temp/claude/C--Users-nikoa-Documents-PROJECTS-DeliryumAI-Contexto/d191f425-61ed-4dfc-83b8-ea7ed5d04b56/scratchpad/final --method all",
+  "input_dir": "data\\raw",
+  "output_dir": "C:\\Users\\nikoa\\AppData\\Local\\Temp\\claude\\C--Users-nikoa-Documents-PROJECTS-DeliryumAI-Contexto\\d191f425-61ed-4dfc-83b8-ea7ed5d04b56\\scratchpad\\final",
+  "methods": [
+    1,
+    2
+  ],
+  "videos_found": 4,
+  "videos_processed": 8,
+  "videos_failed": [],
+  "total_seconds": 186.43489409999893,
+  "runtime": {
+    "device": "cuda",
+    "torch_version": "2.6.0+cu124",
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+    "cuda_version": "12.4"
+  },
+  "code_version": "b763686"
+}

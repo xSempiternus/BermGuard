@@ -1,0 +1,56 @@
+{
+  "video": "video_02.mp4",
+  "method": 2,
+  "method_name": "Linea base por argmax",
+  "frames_processed": 240,
+  "resolution": {
+    "source": [
+      1280,
+      720
+    ],
+    "analyzed": [
+      640,
+      640
+    ],
+    "output": [
+      1280,
+      720
+    ]
+  },
+  "timing": {
+    "average_fps": 16.590223869109074,
+    "ms_per_frame": 58.153672917039025,
+    "ms_per_frame_p95": 66.42830000055255,
+    "stage_ms": {
+      "berm": 27.901644166801514,
+      "detect": 14.42679625006349,
+      "height": 0.30333458316817996,
+      "lighting": 5.2005941667630395,
+      "preprocess": 0.00311291660182178,
+      "proximity": 0.11332291693785616,
+      "render": 3.445083333463117,
+      "shot": 1.2488687498565316,
+      "track": 0.06987541682974552
+    },
+    "total_seconds": 14.466350899994723
+  },
+  "proximity_alerts": 12,
+  "shots_detected": 1,
+  "lighting_distribution": {
+    "day": 0.3958333333333333,
+    "dusk": 0.07083333333333333,
+    "night": 0.5333333333333333
+  },
+  "berm_coverage_mean": 0.9053710937499991,
+  "berm_dropout_rate": 0.0,
+  "berm_crest_jitter_px": 24.107,
+  "runtime": {
+    "device": "cuda",
+    "torch_version": "2.6.0+cu124",
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+    "cuda_version": "12.4"
+  },
+  "code_version": "b763686",
+  "warnings": []
+}

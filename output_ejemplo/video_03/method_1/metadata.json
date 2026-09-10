@@ -1,0 +1,56 @@
+{
+  "video": "video_03.mp4",
+  "method": 1,
+  "method_name": "Prior geometrico",
+  "frames_processed": 240,
+  "resolution": {
+    "source": [
+      1280,
+      720
+    ],
+    "analyzed": [
+      640,
+      640
+    ],
+    "output": [
+      1280,
+      720
+    ]
+  },
+  "timing": {
+    "average_fps": 13.11299409092487,
+    "ms_per_frame": 74.18892166673079,
+    "ms_per_frame_p95": 83.18249999865657,
+    "stage_ms": {
+      "berm": 44.04896958343064,
+      "detect": 14.288217916479576,
+      "height": 0.2919712498017664,
+      "lighting": 5.191110833554073,
+      "preprocess": 0.002983333160955226,
+      "proximity": 0.1304241669762026,
+      "render": 3.4197570829746837,
+      "shot": 1.25736374978563,
+      "track": 0.0742883335078659
+    },
+    "total_seconds": 18.302456199999142
+  },
+  "proximity_alerts": 16,
+  "shots_detected": 1,
+  "lighting_distribution": {
+    "day": 0.3375,
+    "dusk": 0.12916666666666668,
+    "night": 0.5333333333333333
+  },
+  "berm_coverage_mean": 0.9273697916666657,
+  "berm_dropout_rate": 0.0,
+  "berm_crest_jitter_px": 13.431,
+  "runtime": {
+    "device": "cuda",
+    "torch_version": "2.6.0+cu124",
+    "cuda_available": true,
+    "gpu_name": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
+    "cuda_version": "12.4"
+  },
+  "code_version": "b763686",
+  "warnings": []
+}
