@@ -12,21 +12,34 @@ mediciones están en [`reporte_benchmark.md`](reporte_benchmark.md).
 
 ## Ejecución
 
-El comando de referencia del enunciado funciona tal cual:
+### Quick Start — Sin GPU (funciona en cualquier máquina)
 
 ```bash
 docker build -t bermguard:latest .
 
 docker run --rm \
-  -v /ruta/local/test:/app/test \
-  -v /ruta/local/output:/app/output \
+  -v $(pwd)/test:/app/test \
+  -v $(pwd)/output:/app/output \
   bermguard:latest \
   python main.py --input /app/test --output /app/output --method 1
 ```
 
-Si hay GPU, agrega `--gpus all` antes del nombre de la imagen. No es obligatorio: sin GPU el
-pipeline deja una advertencia en el log y sigue en CPU (ver
-[ADR 0001](docs/adr/0001-cuda-como-stack-de-aceleracion.md)).
+### Quick Start — Con GPU (RTX/CUDA instalado en el host)
+
+```bash
+docker build -t bermguard:latest .
+
+docker run --rm --gpus all \
+  -v $(pwd)/test:/app/test \
+  -v $(pwd)/output:/app/output \
+  bermguard:latest \
+  python main.py --input /app/test --output /app/output --method 1
+```
+
+**Nota:** Sin GPU disponible, el pipeline registra un aviso en el log y degrada automáticamente
+a CPU. Esto es deliberado: la base CUDA funciona igual en máquinas sin GPU (ver
+[ADR 0001](docs/adr/0001-cuda-como-stack-de-aceleracion.md)). Con GPU, la ganancia es de ~1.8×
+en resolución 720p.
 
 | Argumento | Valores | Descripción |
 |---|---|---|
