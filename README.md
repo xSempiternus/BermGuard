@@ -105,8 +105,8 @@ Otros documentos:
 
 - [`docs/analisis_material.md`](docs/analisis_material.md): mediciones del material de
   entrada y prueba de los detectores sin entrenar.
-- [`docs/resultados_deteccion.md`](docs/resultados_deteccion.md): resultados del detector
-  entrenado, incluido lo que no funcionó.
+- [`docs/resultados.md`](docs/resultados.md): resultados por objetivo (detección y
+  proximidad, altura del pretil), con sus conclusiones y lo que queda por hacer.
 - [`docs/guia_anotacion.md`](docs/guia_anotacion.md): criterios que usé para anotar.
 - [`data/README.md`](data/README.md): qué datos se versionan y cómo reproducir el
   entrenamiento.
@@ -163,7 +163,7 @@ PyTorch.
 - **El detector sobre-detecta**: precisión 0.297 en `caex`. Encuentra todos los camiones,
   pero ~70 % de sus cajas son falsas, y eso genera alertas de proximidad espurias que el
   tracker solo mitiga en parte. Las dos cosas vienen de lo mismo: 33 bulldozers contra 270
-  CAEX en entrenamiento (ver [`docs/resultados_deteccion.md`](docs/resultados_deteccion.md)).
+  CAEX en entrenamiento (ver [`docs/resultados.md`](docs/resultados.md)).
 - **El pretil se evalúa por estabilidad, no por exactitud.** No tengo el perfil real
   anotado, así que puedo comparar el jitter y el costo entre métodos pero no el error de la
   cresta.
@@ -226,15 +226,10 @@ evidencia de `docs/`:
 
 ## Trabajo futuro
 
-Ordenado por impacto:
+La lista completa, ordenada por objetivo y con el motivo de cada punto, está en la sección 4
+de [`docs/resultados.md`](docs/resultados.md). Lo más importante:
 
-1. **Anotar más bulldozers.** Es la limitación principal y la más barata: unas sesenta
-   anotaciones más duplicarían la clase en cerca de una hora.
-2. **Calibrar la cámara**, con un tablero de ajedrez o los datos de montaje, para bajar el
-   error de la altura.
-3. **Reportar la altura relativa al radio de rueda** del equipo mayor, que es como la
-   normativa define el criterio y además cancela el error de escala.
-4. **Un segmentador neural del pretil** como Método 2, para compararlo con el enfoque
-   geométrico.
-5. **Exportar a ONNX Runtime** y medir la ganancia frente a PyTorch en FP32 y FP16.
-6. **Vigilar la deriva en producción**: alertar si la confianza del detector empieza a caer.
+1. **Anotar más bulldozers.** Es la limitación principal y la más barata de resolver.
+2. **Anotar el perfil real del pretil** en unos 30 frames, para medir exactitud y no solo
+   estabilidad.
+3. **Calibrar la cámara**, para que la altura absoluta sea confiable.

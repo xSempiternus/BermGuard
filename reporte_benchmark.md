@@ -140,7 +140,7 @@ ocre, con polvo y a media distancia.
 ### 3.3 Fine-tuning
 
 131 frames de entrenamiento anotados a mano y 40 de validación (`video_04` completo),
-separados por video y no al azar. Detalle en `docs/resultados_deteccion.md`.
+separados por video y no al azar. Detalle en `docs/resultados.md`.
 
 | Clase | Instancias (train) | mAP@0.5 | mAP@0.5:0.95 | Precisión | Recall |
 |---|---|---|---|---|---|

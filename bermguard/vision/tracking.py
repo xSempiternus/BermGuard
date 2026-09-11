@@ -16,7 +16,7 @@ Las tres funciones que sí resuelve:
 
 **Confirmación antes de reportar.** Un track debe acumular varias detecciones
 consecutivas antes de considerarse un equipo real. Esto ataca directamente el
-problema medido en ``docs/resultados_deteccion.md``: el detector tiene recall 1.000
+problema medido en ``docs/resultados.md``: el detector tiene recall 1.000
 con precisión 0.297, de modo que cerca del 70 % de sus detecciones son falsos
 positivos. Un falso positivo aislado no persiste entre frames —aparece sobre una
 nube de polvo y desaparece—, así que exigir persistencia lo filtra sin tocar el

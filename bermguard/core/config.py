@@ -65,7 +65,7 @@ class TrackerConfig(_Base):
     Es el filtro de falsos positivos: el detector tiene precision 0.297, y un falso
     positivo aislado no persiste entre frames. Exigir persistencia lo descarta sin
     tocar el umbral de confianza, que es lo unico que la clase minoritaria no puede
-    permitirse (ver docs/resultados_deteccion.md)."""
+    permitirse (ver docs/resultados.md)."""
 
     max_age: int = Field(8, ge=1)
     iou_high: float = Field(0.30, ge=0.0, le=1.0)
