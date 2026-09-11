@@ -336,35 +336,51 @@ dominada por el criterio de validación y no por la escena.
 
 ## 5. Eje 3 — Despliegue: CPU contra CUDA
 
-Medido dentro del contenedor, con el comando de referencia del enunciado, sobre la imagen
-construida antes del ADR 0007. Los tiempos por etapa de la tabla siguiente sí son
-posteriores a ese cambio, medidos en el host.
+Medido dentro del contenedor, con el comando de referencia del enunciado y la imagen
+construida desde este mismo código. La fila de 720p agrega los tres videos de esa
+resolución, con el rango entre videos entre paréntesis; la de 1080p corresponde a
+`video_01`, el único en esa resolución.
 
 | Resolución | Sin `--gpus` (CPU) | Con `--gpus all` | Ganancia |
 |---|---|---|---|
-| 1280×720 | 8.2 fps | 15.4 fps | **1.9×** |
-| 1920×1080 | — | 1.5 fps | — |
+| 1280×720 | 8.1 fps (7.5–9.1) | 15.0 fps (14.8–15.2) | **1.8×** |
+| 1920×1080 | 5.2 fps | 7.3 fps | **1.4×** |
 
-**La ganancia es de 1.9×, no de un orden de magnitud, y el desglose por etapa explica
-por qué.** Sobre `video_02` con GPU:
+**La ganancia es de 1.8×, no de un orden de magnitud, y el desglose por etapa explica
+por qué.** Sobre `video_02`, en ms/frame:
 
-| Etapa | ms/frame |
-|---|---|
-| pretil (NumPy/OpenCV, CPU) | 41.8 |
-| detección (CUDA) | 16.4 |
-| luminancia y horizonte | 6.2 |
-| renderizado del OSD | 3.8 |
-| corte de toma | 1.4 |
-| altura, proximidad y tracking | < 0.5 |
+| Etapa | CPU | GPU |
+|---|---|---|
+| detección | 60.2 | **15.6** |
+| pretil (NumPy/OpenCV) | 35.7 | 36.4 |
+| luminancia y horizonte | 3.6 | 3.9 |
+| renderizado del OSD | 2.9 | 3.0 |
+| corte de toma | 0.9 | 1.0 |
+| altura, proximidad y tracking | < 0.5 | < 0.5 |
 
-La GPU acelera únicamente la detección, que ya no es la etapa dominante. La
-segmentación del pretil cuesta 2.5 veces lo que la detección y corre en CPU, de modo que acota la ganancia
-total. Es la ley de Amdahl, y tiene dos consecuencias operativas:
+La GPU divide por casi cuatro la detección y deja todo lo demás igual. En CPU la
+detección es la etapa dominante; con GPU pasa a serlo el pretil, que cuesta 2.3 veces lo
+que la detección y no se acelera, de modo que acota la ganancia total. A 1080p el efecto
+se acentúa: el pretil sube a 74 ms en ambos modos y la ganancia cae a 1.4×. Es la ley de
+Amdahl, y tiene dos consecuencias operativas:
 
-1. **El modo CPU es utilizable** —8 fps sobre clips de diez segundos—, lo que respalda
-   la decisión de degradar en lugar de exigir GPU (ADR 0001).
+1. **El modo CPU es utilizable** —8 fps a 720p y 5 fps a 1080p—, lo que respalda la
+   decisión de degradar en lugar de exigir GPU (ADR 0001).
 2. **Optimizar el detector daría retorno marginal.** El trabajo rendidor sería llevar la
    búsqueda de camino óptimo a GPU, o reducir su resolución de trabajo.
+
+Tres observaciones sobre la medición:
+
+- **En CPU, la detección varió entre 60 y 123 ms por frame** entre videos de la misma
+  resolución, con el mismo modelo. Su costo no depende del contenido, así que la variación
+  es del equipo: repetido en aislamiento, `video_04` bajó de 123 a 79 ms. Es el régimen
+  térmico de un portátil bajo carga sostenida; la tabla usa esa repetición, y por eso las
+  cifras de CPU se dan con su rango.
+- **CPU y GPU no producen artefactos idénticos bit a bit.** La GPU infiere en fp16 y la
+  CPU en fp32; en `video_01` difieren en una alerta de proximidad (33 contra 34) y en los
+  otros tres videos coinciden.
+- **Estas cifras no se comparan con las de las secciones 0 y 4**, tomadas en el host
+  Windows en otra sesión, por la razón que da la sección 4.1.
 
 Medir el desglose antes de optimizar evitó invertir esfuerzo en la etapa equivocada.
 
@@ -513,8 +529,8 @@ del Método 1 —los métodos apoyándose uno en otro— el eje del benchmark pa
 comparar dos formulaciones clásicas a comparar prior geométrico contra representación
 aprendida, que es el contraste que el enunciado propone.
 
-**6. La segmentación del pretil es el cuello de botella** (43.2 ms/frame en 720p,
-90.5 ms en 1080p). Llevar la búsqueda de camino óptimo a GPU, o ejecutarla a resolución
+**6. La segmentación del pretil es el cuello de botella** con GPU (36 ms/frame a 720p
+y 74 ms a 1080p, frente a 16 y 29 ms de la detección). Llevar la búsqueda de camino óptimo a GPU, o ejecutarla a resolución
 reducida e interpolar, es la única optimización con retorno real.
 
 **7. Exportación a ONNX Runtime** y medición del speedup frente a PyTorch en FP32 y
