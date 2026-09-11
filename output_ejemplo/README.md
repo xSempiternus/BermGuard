@@ -1,6 +1,6 @@
 # Salida de ejemplo
 
-Artefactos producidos por una corrida completa sobre el material de muestra:
+Artefactos de una corrida completa sobre el material de muestra:
 
 ```bash
 python main.py --input data/raw --output output --method all
@@ -12,67 +12,40 @@ python main.py --input data/raw --output output --method all
 run_metadata.json                  argumentos, dispositivo, versiones, commit, fallos
 <video>/method_1/
 ├── <video>_osd.mp4                video anotado: cajas por nivel de riesgo, pretil, HUD
-├── berm_height.{png,svg}          curva temporal de altura con banda de incertidumbre
-├── vehicle_spatial.{png,svg}      dispersión cenital + matriz de distancias mínimas
+├── berm_height.{png,svg}          altura en el tiempo con banda de incertidumbre
+├── vehicle_spatial.{png,svg}      posiciones en planta y matriz de distancias mínimas
 ├── berm_profile.csv               serie por frame: altura, cobertura, condición, distancia
 ├── proximity_events.csv           posición y nivel de riesgo por equipo y frame
-├── distance_matrix.csv            distancia mínima registrada por par de equipos
-└── metadata.json                  FPS, ms/frame por etapa, alertas, resoluciones, jitter
+├── distance_matrix.csv            distancia mínima por par de equipos
+└── metadata.json                  FPS, ms por etapa, alertas, resoluciones, jitter
 ```
 
 Los cuatro videos están procesados con el **Método 1** (camino óptimo). El **Método 2**
-—la línea base por `argmax`— se incluye sólo sobre `video_02`, como evidencia del
-contraste que analiza `reporte_benchmark.md`. Comparar `video_02/method_1` con
-`video_02/method_2` muestra la diferencia de estabilidad del perfil.
+(argmax) está solo en `video_02`, para comparar la estabilidad del perfil entre
+`video_02/method_1` y `video_02/method_2`.
 
-Cada gráfico va acompañado del CSV que lo origina, para que las figuras se puedan
-reproducir desde los datos en lugar de tener que creerlas.
+## Dos advertencias
 
----
+**Tres de los cuatro videos son de entrenamiento.** El detector se entrenó con frames de
+`video_01`, `video_02` y `video_03`, así que en esos se ve mejor de lo que realmente es.
+`video_04` quedó completo para validación y es el único resultado sobre material que el
+modelo no vio. Las métricas de detección del reporte se calculan sobre él.
 
-## Dos advertencias sobre cómo leer esto
-
-### Tres de los cuatro videos son resultados *dentro de muestra*
-
-El detector se entrenó con frames de `video_01`, `video_02` y `video_03`. Sus salidas
-aquí están producidas por un modelo que vio esos frames exactos durante el
-entrenamiento, y por tanto **se ven mejor de lo que el sistema realmente es**.
-
-`video_04` se reservó íntegro como conjunto de validación y **nunca se usó para
-entrenar**. Es la única evidencia fuera de muestra de este directorio, y por tanto el
-único predictor honesto de cómo se comportará el sistema sobre material nuevo.
-
-Las métricas del reporte se calculan sobre `video_04`.
-
-### Los videos se recodificaron para el entregable
-
-El pipeline escribe `mp4v`, elegido porque es el único códec siempre disponible en las
-ruedas de OpenCV y por tanto el que garantiza que la imagen funcione sin retoques en
-una máquina ajena (ver la nota en `bermguard/io/video_writer.py`).
-
-Los archivos de este directorio se recodificaron a **H.264 (CRF 24)** para que quepan
-en el repositorio: los cinco videos pasan de 56.9 MB a 15.9 MB sin cambio visible. El contenido —cada frame,
-cada caja, cada curva— es el que produjo el pipeline. Al ejecutar el contenedor se
-obtienen los mismos artefactos en `mp4v`, más pesados.
-
----
+**Los videos se recodificaron.** El pipeline escribe `mp4v`, el único códec que siempre
+viene con OpenCV (ver `bermguard/io/video_writer.py`). Acá los pasé a H.264 (CRF 24) para
+que quepan en el repositorio: los cinco videos bajan de 56.9 MB a 15.9 MB sin diferencia
+visible. El contenido es el que generó el pipeline, y al ejecutar el contenedor se obtienen
+los mismos videos en `mp4v`.
 
 ## Qué mirar primero
 
-1. **`video_04/method_1/video_04_osd.mp4`** — la única salida fuera de muestra. Cajas
-   verdes, ámbar y rojas según proximidad, con identidad persistente por equipo, y el
-   pretil delineado sobre el quiebre de terreno.
-
-   Conviene mirarlo sabiendo qué se degrada aquí y no en los otros tres. En el frame
-   130, por ejemplo, el CAEX y el bulldozer se detectan como **entidades separadas** y
-   ambos en nivel de precaución —que es el comportamiento que el modelo base no podía
-   producir—, pero la caja del camión se extiende bastante más allá de la máquina, y esa
-   caja sobredimensionada arrastra la región de búsqueda del pretil hacia el primer plano:
-   la curva se asienta sobre las huellas de neumático en lugar de sobre el banco que está
-   detrás del bulldozer. Es la interacción de dos limitaciones que el
-   `reporte_benchmark.md` cuantifica —precisión 0.297 en el detector y dominancia del
-   gradiente del primer plano—, y el ADR 0007 la describe.
-2. **`video_01/method_1/berm_height.png`** — la curva de altura con su banda de
-   incertidumbre y los huecos declarados en los dos cortes de escena que tiene ese clip.
-3. **`video_02/method_1` contra `video_02/method_2`** — el contraste entre las dos
-   formulaciones, en el campo `berm_crest_jitter_px` de cada `metadata.json`.
+1. **`video_04/method_1/video_04_osd.mp4`**, el único fuera de muestra. En el frame 130, por
+   ejemplo, el CAEX y el bulldozer salen como **dos equipos separados** y ambos en
+   precaución, algo que el modelo COCO no lograba. Pero la caja del camión es bastante más
+   grande que la máquina, y esa caja arrastra la búsqueda del pretil al primer plano: la
+   curva queda sobre las huellas de neumático y no sobre el banco detrás del bulldozer. Está
+   explicado en el ADR 0007.
+2. **`video_01/method_1/berm_height.png`**: la altura con su banda de incertidumbre y los
+   huecos en los dos cortes de escena del clip.
+3. **`video_02/method_1` contra `video_02/method_2`**: la diferencia de estabilidad, en el
+   campo `berm_crest_jitter_px` de cada `metadata.json`.

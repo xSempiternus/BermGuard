@@ -1,71 +1,51 @@
-# ADR 0005 — El detector opera sobre frames sin acondicionar
+# ADR 0005: El detector recibe el frame sin procesar
 
-- **Estado:** aceptada
-- **Fecha:** 2026-09-08
-- **Relacionado:** ADR 0004 (los datos de entrenamiento salen de esta decisión)
+- Estado: aceptada
+- Fecha: 2026-09-08
+- Relacionado: ADR 0004
 
 ## Contexto
 
-El material recorre luminancias medias entre 19 y 163, y más de la mitad de los frames de tres
-de los cuatro clips son nocturnos. El acondicionamiento de imagen —ecualización adaptativa de
-contraste, corrección gamma— mejora sustancialmente la visibilidad en ese rango.
+La luminancia media del material va de 19 a 163, y más de la mitad de los frames de tres
+clips son de noche. Realzar el contraste (CLAHE, corrección gamma) mejora mucho la
+visibilidad.
 
-La pregunta es dónde aplicarlo, y no es una cuestión de gusto. Un modelo debe encontrar en
-inferencia la misma distribución de entradas que vio en entrenamiento. Si el pipeline
-acondiciona el frame antes del detector, el conjunto de entrenamiento tiene que estar
-acondicionado del mismo modo.
-
-La decisión debía tomarse **antes** de anotar, porque determina qué imágenes se anotan y
-rehacer ese trabajo cuesta horas.
+La pregunta es dónde aplicarlo. Un modelo tiene que ver en inferencia lo mismo que vio en
+entrenamiento: si el pipeline realza el frame antes del detector, los datos de
+entrenamiento tienen que estar realzados igual. Había que decidirlo antes de anotar, porque
+define qué imágenes se anotan.
 
 ## Decisión
 
-**El detector recibe el frame tal como sale del decodificador.** El acondicionamiento se
-aplica únicamente en la rama de segmentación del pretil.
+**El detector recibe el frame tal como sale del video.** El realce se aplica solo en la
+rama del pretil, y por eso los frames del ADR 0004 se anotaron sin procesar.
 
-En consecuencia, el conjunto de entrenamiento del ADR 0004 se compone de frames sin
-acondicionar, que es lo que `scripts/prepare_labeling_set.py` extrae.
+Razones:
 
-Dos razones:
+- **El aumento de datos cubre lo mismo.** El entrenamiento varía el brillo y la saturación
+  más de lo normal (`hsv_v=0.6`, `hsv_s=0.5`), según el rango medido del material. Así el
+  modelo aprende a tolerar los cambios de luz en vez de depender de un preprocesado.
+- **Atar el detector al preprocesado lo hace frágil.** Si se entrena sobre una
+  configuración de CLAHE, cambiar un parámetro obliga a reentrenar. El pretil sí necesita
+  el realce, porque es un método de gradientes y sin contraste no tiene señal, pero esa
+  dependencia no tiene por qué pasar al detector.
 
-**La augmentación cubre lo que el acondicionamiento resolvería.** El entrenamiento aplica
-variación de brillo y saturación por encima de los valores habituales (`hsv_v=0.6`,
-`hsv_s=0.5`), calibrada contra el rango medido del material. Eso enseña invarianza a la
-iluminación dentro del modelo, en lugar de imponerla desde fuera. Un modelo invariante es
-preferible a uno que depende de que su preprocesado se comporte igual siempre.
+## Alternativas descartadas
 
-**Acoplar el detector al preprocesado lo vuelve frágil.** Si el detector se entrena sobre
-frames con una configuración concreta de ecualización, cambiar un parámetro de esa
-configuración deja el modelo desalineado con su entrada y obliga a reentrenar. La rama del
-pretil sí necesita ese acondicionamiento porque es un método clásico basado en gradientes, que
-sin contraste no tiene señal; pero esa dependencia no debe propagarse al detector.
-
-## Alternativas consideradas
-
-**Acondicionar antes del detector y entrenar sobre frames acondicionados.** Probablemente
-mejoraría la detección nocturna a corto plazo. Se descarta por el acoplamiento descrito, y
-porque quedaría una segunda calibración implícita —la del preprocesado— que también habría que
-validar contra el conjunto ciego sin poder medirla.
-
-**Acondicionar antes del detector sin reentrenar.** Descartada sin discusión: introduciría un
-desajuste entre entrenamiento e inferencia, que es precisamente el error que esta decisión
-existe para evitar.
-
-**Entrenar dos detectores, uno diurno y uno nocturno, seleccionados por la clasificación
-lumínica del ADR 0003.** Es defendible y podría rendir mejor. Se descarta por presupuesto de
-datos: dividir un conjunto de 171 frames anotados en dos lo deja sin material suficiente para
-ninguno de los dos.
+- **Realzar antes del detector y entrenar con frames realzados.** Probablemente ayudaría de
+  noche, pero ata el detector al preprocesado y agrega otra calibración que no puedo
+  validar contra el conjunto ciego.
+- **Realzar antes del detector sin reentrenar.** Crearía justo el desajuste entre
+  entrenamiento e inferencia que se quiere evitar.
+- **Dos detectores, uno de día y otro de noche**, elegidos con la clasificación de luz del
+  ADR 0003. Podría rendir mejor, pero 171 frames divididos en dos no alcanzan para ninguno.
 
 ## Consecuencias
 
-- Las máquinas que resultan indistinguibles en el frame sin acondicionar no se anotan, según
-  establece `docs/guia_anotacion.md`. Es coherente: si el anotador no las distingue sobre los
-  mismos píxeles que verá el modelo, la etiqueta sería una suposición.
-- El rendimiento nocturno del detector depende enteramente de la augmentación durante el
-  entrenamiento. Es una apuesta declarada, y su verificación es una fila del reporte de
-  benchmark: las métricas se reportan segmentadas por condición lumínica precisamente para
-  poder comprobarla o refutarla.
-- El pipeline mantiene dos rutas de imagen desde el mismo frame: sin acondicionar hacia el
-  detector, acondicionada hacia la segmentación del terreno. El orquestador debe conservar el
-  frame original, y de hecho el renderizado del OSD también dibuja sobre él y no sobre la
-  versión analizada.
+- Las máquinas que no se distinguen en el frame sin procesar no se anotan
+  (`docs/guia_anotacion.md`). Si yo no las distingo en los mismos píxeles que ve el modelo,
+  la etiqueta sería una suposición.
+- El rendimiento nocturno del detector depende del aumento de datos. No alcancé a medir el
+  detector por condición de luz, así que esta apuesta sigue sin verificarse.
+- El pipeline mantiene dos versiones del frame: la original para el detector y el OSD, y la
+  realzada para el pretil.

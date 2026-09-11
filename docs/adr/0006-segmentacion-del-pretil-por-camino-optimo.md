@@ -1,141 +1,76 @@
-# ADR 0006 — Segmentación del pretil: búsqueda de camino óptimo
+# ADR 0006: La cresta del pretil como camino óptimo
 
-- **Estado:** aceptada
-- **Fecha:** 2026-09-09
-- **Evidencia:** `docs/analisis_material.md`, sección 1
-- **Implementación:** `bermguard/vision/berm/classical.py`
-- **Modificado por:** ADR 0007 — la banda de búsqueda descrita aquí se acota ahora
-  también por arriba, porque de noche el camino se confundía con el horizonte. Las cifras
-  de jitter de este documento son anteriores a ese cambio; las vigentes están en
-  `reporte_benchmark.md`.
+- Estado: aceptada, modificada por el ADR 0007
+- Fecha: 2026-09-09
+- Implementación: `bermguard/vision/berm/classical.py`
 
 ## Contexto
 
-El Método 1 debe localizar la cresta y la base del pretil sin ningún modelo entrenado. El
-plan inicial contemplaba el enfoque habitual: gradiente vertical, `argmax` por columna, y
-suavizado posterior del perfil.
+El Método 1 tiene que encontrar la cresta y la base del pretil sin un modelo entrenado. La
+idea inicial era la habitual: gradiente vertical, argmax por columna y suavizado. Al
+medirlo sobre el material vi que no funcionaba, por tres razones:
 
-La medición sobre el material mostró que ese enfoque no es viable tal cual, por tres razones
-que se comprobaron una por una:
+- **El gradiente vertical es más fuerte en el primer plano que en el pretil.** Por bandas
+  de filas, la energía crece hacia abajo hasta 379 en el último décimo del frame, contra 223
+  en la banda de la cresta. Las huellas de neumático y las sombras responden más que el
+  pretil.
+- **Exigir coherencia horizontal no ayuda.** Promediar el gradiente en ventanas de 31, 81 y
+  161 px deja el orden de las filas igual, porque las huellas son tan horizontales como el
+  pretil.
+- **El pretil tiene poco contraste.** Es tierra oscura sobre suelo del mismo color.
 
-**La energía de gradiente vertical es máxima en el primer plano, no en el pretil.** Por bandas
-de filas, la energía media crece monótonamente hacia abajo hasta 379 en el último décimo del
-frame, frente a 223 en la banda donde está la cresta. Las huellas de neumático y las sombras
-largas producen respuestas más fuertes que el propio pretil, de modo que un `argmax` global
-por columna elige textura del terreno.
-
-**Exigir coherencia horizontal no separa nada.** Promediar el gradiente sobre ventanas de 31,
-81 y 161 píxeles de ancho deja el orden de las filas por energía **exactamente igual**: las
-huellas de neumático son tan horizontales como el pretil.
-
-**El contraste del pretil es bajo.** Es un banco de tierra oscura sobre suelo del mismo color,
-no un borde limpio.
-
-Una primera implementación con `argmax` por columna, filtro de mediana y Savitzky-Golay
-produjo un perfil inutilizable: saltos de cientos de píxeles entre columnas contiguas, con la
-curva enganchada a los vehículos y a las nubes de polvo.
+La primera versión, con argmax, filtro de mediana y Savitzky-Golay, daba saltos de cientos
+de píxeles entre columnas vecinas, con la curva pegada a vehículos y polvo.
 
 ## Decisión
 
-**Buscar la cresta como un camino de máxima respuesta acumulada mediante programación
-dinámica, con el salto vertical acotado entre columnas contiguas.**
+**Buscar la cresta como el camino de mayor respuesta acumulada, con programación dinámica
+y un salto vertical máximo entre columnas vecinas.**
 
-El diagnóstico del fracaso inicial es que el `argmax` por columna decide cada columna de forma
-independiente. La continuidad del pretil es un prior fuerte y disponible, pero un
-post-procesado no puede recuperarla: cuando el filtro actúa, la información ya se perdió al
-elegir el máximo local de cada columna por separado.
+El argmax decide cada columna por separado, y cuando el filtro actúa la continuidad ya se
+perdió. Con el camino óptimo la continuidad pasa a ser una restricción del problema: se
+maximiza la suma de respuestas a lo largo de un camino que cruza todas las columnas, con un
+salto máximo de `max_step_px` (3 por defecto). Cada paso se resuelve con un filtro de máximo
+deslizante, así que el costo es una pasada vectorizada por columna.
 
-La formulación como camino óptimo convierte ese prior en **una restricción del problema**. Se
-maximiza la suma de respuestas a lo largo de un camino que recorre todas las columnas, sujeto
-a que el salto vertical entre columnas contiguas no supere `max_step_px` (3 por defecto). El
-paso hacia adelante se resuelve con un filtro de máximo deslizante, porque «mejor predecesor
-dentro de una ventana» es exactamente esa operación, y eso deja el coste en una pasada
-vectorizada por columna.
+Además:
 
-Acompañan tres decisiones necesarias para que la búsqueda tenga sentido:
+- **Gradiente a escala gruesa y solo positivo.** Se suaviza antes de derivar para que
+  sobreviva el escalón del pretil y se cancele la textura fina. Me quedo con el signo
+  positivo porque la cresta oscurece hacia abajo, mientras que la textura cambia de signo.
+- **Se excluye la maquinaria.** Las cajas detectadas, algo agrandadas, se anulan antes de
+  buscar. Una máquina tiene bordes mucho más marcados que un banco de tierra.
+- **Banda de búsqueda acotada.** Es la franja de filas donde se busca el pretil. Por arriba
+  se excluye el cielo, detectado por varianza por fila. Por abajo, el punto de contacto más
+  bajo de la maquinaria, porque en la imagen el pretil siempre está sobre la rasante. El
+  ADR 0007 le agregó un límite superior.
+- **Se valida el camino.** El camino óptimo siempre existe, incluso sobre suelo liso. Las
+  columnas cuya respuesta no supera 3 veces la mediana de la banda se marcan como `NaN`.
+- **Suavizado.** El perfil se suaviza con Savitzky-Golay y se promedia en el tiempo con una
+  media móvil exponencial (α=0.3).
 
-**Gradiente a escala gruesa y con signo.** Se suaviza con una gaussiana antes de derivar
-—equivalente a una derivada de gaussiana— de modo que el escalón estructural sobrevive y la
-textura de alta frecuencia se cancela. Se conserva sólo el signo positivo, porque la cresta
-oscurece hacia abajo mientras la textura oscila de signo.
+## Alternativas descartadas
 
-**Exclusión de la maquinaria.** Las cajas de las detecciones se anulan en la respuesta antes
-de buscar, dilatadas para cubrir el desenfoque de movimiento y el polvo adyacente. El pretil
-es terreno; una máquina produce bordes mucho más marcados que un banco de tierra.
-
-**Banda de búsqueda acotada.** Por arriba se excluye el cielo, que es el borde horizontal más
-nítido de la escena, detectándolo por varianza por fila. Por abajo se usa el punto de contacto
-más bajo de la maquinaria detectada: el pretil está siempre por encima de la rasante en el
-espacio imagen.
-
-**Validación explícita del camino.** El camino óptimo existe siempre, también sobre suelo
-liso. Sin validar, el método devolvería una línea inventada con aspecto convincente. La
-respuesta a lo largo del camino se compara contra un umbral relativo, y las columnas que no
-lo superan se marcan `NaN`.
-
-## Alternativas consideradas
-
-**`argmax` por columna con filtrado posterior.** Implementada y descartada por medición: el
-perfil resultante salta entre estructuras no relacionadas y la curva se engancha a los
-vehículos. El filtrado no lo corrige porque actúa cuando la información de continuidad ya se
-perdió.
-
-**Coherencia horizontal por filtrado de ventana ancha.** Probada con tres anchos distintos.
-No altera el orden de las filas por energía, porque la textura del primer plano es tan
-horizontal como el pretil.
-
-**Umbralizado del gradiente y análisis de componentes conexas.** Descartado por el bajo
-contraste: cualquier umbral que capture el pretil captura también la textura del terreno, y
-las componentes resultantes se fusionan.
-
-**Ajuste de una recta o parábola por RANSAC.** Descartado porque impone una forma que el
-pretil no tiene: sigue el borde del botadero, que es curvo e irregular por diseño. Un modelo
-paramétrico rígido descartaría como outliers precisamente las variaciones que interesa medir
-—una zona hundida del pretil es la señal, no el ruido.
+- **Argmax por columna con filtrado.** Lo implementé y lo descarté midiendo: el perfil salta
+  entre estructuras sin relación. Quedó como Método 2, la línea base del benchmark.
+- **Coherencia horizontal con ventanas anchas.** Probada con tres anchos; no cambia el orden
+  de las filas.
+- **Umbralizar y buscar componentes conexas.** Con tan poco contraste, cualquier umbral que
+  capte el pretil capta también la textura.
+- **Ajustar una recta o parábola con RANSAC.** El pretil sigue el borde del botadero, que es
+  irregular. Un modelo rígido trataría como outliers justo las zonas hundidas, que son lo
+  que interesa detectar.
 
 ## Consecuencias
 
-### La cobertura no es una métrica utilizable con este método
-
-Es el hallazgo más incómodo y conviene declararlo antes que nada, porque la cobertura era la
-métrica prevista para cuantificar la calidad de la segmentación sin ground truth.
-
-El camino óptimo recorre **todas** las columnas por construcción, de modo que la cobertura
-depende enteramente del criterio con que se validan sus columnas. Y se probaron dos:
-
-| Criterio de validación | Cobertura medida |
-|---|---|
-| Percentil 55 de la respuesta del propio camino | 43 % en los 4 videos y las 3 condiciones |
-| 3 × la mediana de la banda de búsqueda | 92–95 % en los 4 videos y las 3 condiciones |
-
-**Ninguna de las dos cifras describe el pretil.** La primera es el complemento del percentil
-elegido, y sale idéntica porque un percentil selecciona por rango: siempre acepta la misma
-fracción. La segunda es alta y uniforme porque la respuesta de gradiente a escala gruesa es
-suave y no nula en casi todas las columnas, de modo que cualquier umbral referido al ruido las
-acepta.
-
-Que el número sea insensible a la condición lumínica —cuando el contraste varía dos órdenes de
-magnitud entre día y noche— es la señal de que mide el umbral y no la escena.
-
-Se conserva el criterio referido al ruido, por ser el más defendible de los dos, y **la
-cobertura se reporta con esta advertencia explícita en lugar de presentarse como medida de
-calidad**. La métrica que sí sería informativa sin ground truth es el **jitter temporal** de la
-cresta —la desviación estándar de su variación entre frames consecutivos—, que es además lo que
-el enunciado penaliza al hablar de parpadeo. Queda pendiente.
-
-### Otras consecuencias
-
-- El método no delinea el pretil completo. En las escenas nocturnas la inspección visual
-  muestra que la curva se engancha a penachos de polvo iluminados por los faros, y eso no lo
-  refleja ninguna de las dos cifras de cobertura.
-- El coste es de 57 ms por frame en 720p y 120 ms en 1080p, comparable o superior al de la
-  inferencia del detector. Es el precio de una búsqueda global sobre toda la rejilla.
-- La calidad depende de que haya maquinaria detectada. Sin ella, la banda de búsqueda es un
-  recorte grosero del frame y la confianza reportada se penaliza a la mitad.
-- **El comportamiento nocturno está sin verificar** al momento de escribir este ADR. La
-  medición por condición lumínica es parte del reporte de benchmark.
-- El contrato `IBermSegmenter.segment` pasó a recibir las detecciones del frame. Es un
-  acoplamiento entre la rama de maquinaria y la de terreno que el diseño inicial evitaba
-  deliberadamente. Se acepta porque la dependencia es física y no accidental: la segmentación
-  de terreno necesita saber dónde están las máquinas para excluirlas y para situar la rasante.
-  Sigue siendo opcional, de modo que un segmentador puede ignorarlas.
+- **La cobertura no sirve como métrica.** El camino pasa por todas las columnas, así que la
+  cobertura depende solo del criterio de validación (sección 4.3 del reporte). Por eso la
+  calidad se mide con el jitter temporal de la cresta.
+- **Es la etapa más cara con GPU**: 36 ms por frame a 720p y 74 ms a 1080p, porque recorre
+  toda la rejilla.
+- **Depende de que haya maquinaria detectada.** Sin ella la banda es un recorte grueso del
+  frame y la confianza reportada baja a la mitad.
+- `IBermSegmenter.segment` recibe las detecciones del frame. Es un acoplamiento entre la
+  rama de maquinaria y la de terreno que al principio quería evitar, pero es físico: el
+  terreno necesita saber dónde están las máquinas para excluirlas y ubicar la rasante. Es
+  opcional, así que un segmentador puede ignorarlas.

@@ -1,20 +1,18 @@
 # BermGuard AI
 
-Pipeline de visión por computadora para faenas mineras a rajo abierto. Sobre una carpeta de
-videos de botadero, produce por cada uno: un video anotado, la segmentación del pretil de
-seguridad, la evaluación de proximidad entre maquinaria y los metadatos de ejecución.
+Pipeline de visión por computadora para botaderos de minería a rajo abierto. Recibe una
+carpeta de videos y, por cada uno, genera un video anotado, la segmentación y la altura del
+pretil, la proximidad entre equipos y los metadatos de ejecución.
 
-**Por dónde empezar.** El resultado se ve en
-`output_ejemplo/video_04/method_1/video_04_osd.mp4` — la única salida producida sobre
-material que el detector nunca vio. Este README explica cómo se ejecuta y qué decisiones
-lo sostienen; [`reporte_benchmark.md`](reporte_benchmark.md) contiene la comparación de
-los métodos y las mediciones.
+Para ver el resultado, parte por `output_ejemplo/video_04/method_1/video_04_osd.mp4`: es el
+único video que el detector no vio durante el entrenamiento. La comparación de métodos y las
+mediciones están en [`reporte_benchmark.md`](reporte_benchmark.md).
 
 ---
 
 ## Ejecución
 
-El contrato de ejecución es el comando de referencia del enunciado, y funciona tal cual:
+El comando de referencia del enunciado funciona tal cual:
 
 ```bash
 docker build -t bermguard:latest .
@@ -26,221 +24,176 @@ docker run --rm \
   python main.py --input /app/test --output /app/output --method 1
 ```
 
-Con GPU disponible, añadir `--gpus all` antes del nombre de la imagen. **No es necesario:**
-el pipeline detecta la ausencia de CUDA, registra una advertencia explícita y continúa en CPU.
-Ver [ADR 0001](docs/adr/0001-cuda-como-stack-de-aceleracion.md) para el razonamiento.
-
-### Argumentos
+Si hay GPU, agrega `--gpus all` antes del nombre de la imagen. No es obligatorio: sin GPU el
+pipeline deja una advertencia en el log y sigue en CPU (ver
+[ADR 0001](docs/adr/0001-cuda-como-stack-de-aceleracion.md)).
 
 | Argumento | Valores | Descripción |
 |---|---|---|
-| `--input` | ruta | Directorio con los videos. Los archivos que no son video se ignoran |
-| `--output` | ruta | Directorio de artefactos. Se crea si no existe |
+| `--input` | ruta | Carpeta con los videos. Lo que no sea video se ignora |
+| `--output` | ruta | Carpeta de salida. Se crea si no existe |
 | `--method` | `1`, `2`, `all` | `1` camino óptimo, `2` línea base por argmax, `all` ambos |
 | `--device` | `auto`, `cuda`, `cpu` | Por defecto `auto` |
-| `--max-frames` | entero | Tope de frames por video, para pruebas rápidas |
+| `--max-frames` | entero | Límite de frames por video, para pruebas rápidas |
 | `--log-level` | `DEBUG`…`ERROR` | Por defecto `INFO` |
 
-Todos los pesos van horneados en la imagen. No se descarga nada en tiempo de ejecución.
+Los pesos del modelo van dentro de la imagen, así que no se descarga nada al ejecutar.
 
-### Artefactos de salida
+### Salida
 
 ```
 output/
-├── run_metadata.json                  # argumentos, dispositivo, versiones, commit, fallos
+├── run_metadata.json              argumentos, dispositivo, versiones, commit, fallos
 └── <video>/method_<n>/
-    ├── <video>_osd.mp4                # video con la capa de anotación
-    ├── metadata.json                  # FPS, ms/frame por etapa, alertas, resoluciones
-    ├── berm_profile.csv               # serie temporal del pretil, datos crudos
-    └── proximity_events.csv           # posiciones y nivel de riesgo por track
+    ├── <video>_osd.mp4            video anotado
+    ├── berm_height.{png,svg}      altura del pretil en el tiempo, con banda de incertidumbre
+    ├── vehicle_spatial.{png,svg}  posiciones en planta y distancias (si hubo equipos)
+    ├── berm_profile.csv           serie por frame del pretil
+    ├── proximity_events.csv       posición y nivel de riesgo por equipo y frame
+    ├── distance_matrix.csv        distancia mínima por par de equipos
+    └── metadata.json              FPS, ms por etapa, alertas, resoluciones, jitter
 ```
 
-Cada gráfico se acompaña de su CSV a propósito: permite reproducir la figura desde los datos
-en lugar de confiar en la imagen.
+Cada gráfico va con el CSV que lo genera, para poder rehacerlo desde los datos.
 
 ---
 
 ## Arquitectura
 
 ```
-main.py                    CLI. Interpreta argumentos, construye y delega
+main.py          CLI: lee los argumentos, arma el pipeline y lo ejecuta
 bermguard/
-├── core/                  Tipos del dominio, Protocols, excepciones, configuración
-├── io/                    Lectura y escritura de video, metadatos y series
-├── vision/                Detección, segmentación de terreno, condición lumínica, cortes
-├── analytics/             Geometría, altura y proximidad
-├── pipeline/              Orquestación, factory y renderizado del OSD
-└── benchmark/             Métricas comparativas entre métodos
+├── core/        tipos del dominio, interfaces (Protocol), errores, configuración
+├── io/          lectura y escritura de video, metadatos y CSV
+├── vision/      detección, segmentación del pretil, condición de luz, cortes
+├── analytics/   geometría, altura y proximidad
+├── pipeline/    orquestador, factory y dibujo del OSD
+└── benchmark/   métricas para comparar métodos
 ```
 
-Tres decisiones estructurales sostienen el resto:
+Tres ideas ordenan el código:
 
-**El orquestador depende de abstracciones.** Conoce únicamente los `Protocol` de
-`core/interfaces.py`, nunca una clase concreta. Incorporar un método nuevo consiste en
-escribir sus implementaciones y registrarlas en `pipeline/factory.py`; ninguna línea del
-orquestador cambia. Esto se verificó en la práctica al sustituir el detector preentrenado por
-el especializado: cambió una ruta en `configs/`.
-
-**Los tipos del dominio son inmutables y no saben de librerías.** `analytics/` opera sobre
-dataclasses y arrays, de modo que se testea sin GPU, sin modelo y sin archivo de video.
-
-**Segmentar y medir son etapas separadas.** Un `IBermSegmenter` dice dónde está el pretil en
-píxeles; un `IHeightEstimator` lo convierte a metros. Fallan por separado —puede haber pretil
-perfectamente delineado sin ningún vehículo que sirva de ancla métrica— y el sistema lo
-refleja en vez de descartar una segmentación válida por falta de escala.
+- **El orquestador solo conoce interfaces.** Usa los `Protocol` de `core/interfaces.py` y
+  nunca una clase concreta. Un método nuevo se agrega implementando esas interfaces y
+  registrándolo en `pipeline/factory.py`. Cambiar el detector COCO por el entrenado fue
+  cambiar una ruta en `configs/`.
+- **Los tipos del dominio son inmutables y no dependen de librerías.** `analytics/` trabaja
+  con dataclasses y arrays, así que se prueba sin GPU, sin modelo y sin video.
+- **Segmentar y medir están separados.** `IBermSegmenter` encuentra el pretil en píxeles e
+  `IHeightEstimator` lo pasa a metros. Pueden fallar por separado: si hay pretil pero ningún
+  vehículo que dé la escala, se conserva la segmentación y la altura queda vacía.
 
 ---
 
-## Decisiones de diseño
+## Decisiones
 
-Cada decisión no trivial está registrada como ADR, con su contexto, las alternativas
-consideradas y sus consecuencias.
+Las decisiones importantes están en `docs/adr/`, una por archivo. Cada ADR (registro de
+decisión de arquitectura) explica el contexto, lo que se decidió, las alternativas
+descartadas y las consecuencias. El número es solo el orden en que las fui tomando.
 
 | ADR | Decisión |
 |---|---|
-| [0001](docs/adr/0001-cuda-como-stack-de-aceleracion.md) | CUDA como stack, con degradación a CPU por selección de dispositivo |
-| [0002](docs/adr/0002-deteccion-de-maquinaria.md) | Fine-tuning del detector, tras descartar zero-shot con evidencia medida |
-| [0003](docs/adr/0003-segmentacion-por-toma-y-condicion-luminica.md) | La toma es la unidad de análisis; la condición lumínica se clasifica por frame |
-| [0004](docs/adr/0004-datos-de-entrenamiento-del-dominio.md) | Datos propios anotados por sobre tres datasets públicos evaluados |
-| [0005](docs/adr/0005-el-detector-opera-sobre-frames-crudos.md) | El detector no ve acondicionamiento de imagen; la rama de terreno sí |
-| [0006](docs/adr/0006-segmentacion-del-pretil-por-camino-optimo.md) | La cresta del pretil como camino óptimo, no como `argmax` por columna |
-| [0007](docs/adr/0007-banda-del-pretil-anclada-a-la-maquinaria.md) | La banda de búsqueda del pretil se ancla a la maquinaria por arriba, para no confundirlo con el horizonte |
+| [0001](docs/adr/0001-cuda-como-stack-de-aceleracion.md) | CUDA como aceleración, con respaldo en CPU |
+| [0002](docs/adr/0002-deteccion-de-maquinaria.md) | Entrenar un detector propio, después de medir que el zero-shot no separa las máquinas |
+| [0003](docs/adr/0003-segmentacion-por-toma-y-condicion-luminica.md) | La toma es la unidad de análisis y la luz se clasifica por frame |
+| [0004](docs/adr/0004-datos-de-entrenamiento-del-dominio.md) | Entrenar con frames del propio material en vez de datasets públicos |
+| [0005](docs/adr/0005-el-detector-opera-sobre-frames-crudos.md) | El detector recibe el frame sin procesar; el realce de contraste es solo para el pretil |
+| [0006](docs/adr/0006-segmentacion-del-pretil-por-camino-optimo.md) | La cresta del pretil se busca como camino óptimo y no con argmax por columna |
+| [0007](docs/adr/0007-banda-del-pretil-anclada-a-la-maquinaria.md) | La banda de búsqueda del pretil se limita por arriba con la maquinaria, para que no se vaya al horizonte |
 
-Documentos de respaldo:
+Otros documentos:
 
-- [`docs/analisis_material.md`](docs/analisis_material.md) — caracterización medida del
-  material de entrada y de los dos enfoques de detección sin entrenamiento
-- [`docs/resultados_deteccion.md`](docs/resultados_deteccion.md) — resultados del detector
-  especializado, incluido lo que no funcionó
-- [`docs/guia_anotacion.md`](docs/guia_anotacion.md) — protocolo de anotación
-- [`reporte_benchmark.md`](reporte_benchmark.md) — comparación de los métodos, con las
-  métricas que resultaron no medir lo que se esperaba
+- [`docs/analisis_material.md`](docs/analisis_material.md): mediciones del material de
+  entrada y prueba de los detectores sin entrenar.
+- [`docs/resultados_deteccion.md`](docs/resultados_deteccion.md): resultados del detector
+  entrenado, incluido lo que no funcionó.
+- [`docs/guia_anotacion.md`](docs/guia_anotacion.md): criterios que usé para anotar.
+- [`data/README.md`](data/README.md): qué datos se versionan y cómo reproducir el
+  entrenamiento.
 
-### Ambigüedad del enunciado, resuelta y declarada
+### Una ambigüedad del enunciado
 
-Los requisitos exigen *«usar GPU (CUDA o ROCm o OPENVINO…)»*, mientras que el único comando de
-referencia publicado no pasa `--gpus`, de modo que ejecutado literalmente levanta un contenedor
-sin acceso al dispositivo. Como la evaluación se describe como automatizada, no hay forma de
-saber de antemano cuál de los dos escenarios ocurrirá.
-
-El costo de equivocarse es asimétrico: `docker run --gpus all` falla al arrancar si el host no
-tiene el runtime de NVIDIA, mientras que una imagen construida sobre base CUDA se ejecuta sin
-problemas en una máquina sin GPU. Se asumió por tanto que el sistema debe operar en ambos
-modos, con CUDA como camino declarado y la degradación a CPU como seguro.
+El enunciado pide usar GPU, pero el comando de referencia no incluye `--gpus`, así que
+ejecutado tal cual el contenedor no ve la GPU. No sé cuál de los dos escenarios usará la
+evaluación automática, y equivocarse no cuesta lo mismo en ambos casos: `--gpus all` hace
+fallar el arranque en una máquina sin el runtime de NVIDIA, mientras que una imagen con base
+CUDA corre sin problema en una sin GPU. Por eso el sistema funciona en los dos modos: CUDA si
+está disponible y CPU si no.
 
 ---
 
-## Rendimiento medido
+## Rendimiento
 
-Ejecutando el comando de referencia dentro del contenedor, sobre el material de muestra y con
-la imagen construida desde este mismo código. Hardware: RTX 3050 Ti Laptop (4 GB) e Intel de
-portátil.
+Medido con el comando de referencia dentro del contenedor, con la imagen construida desde
+este código. Equipo: portátil con RTX 3050 Ti (4 GB).
 
-| Resolución | Sin `--gpus` (CPU) | Con `--gpus all` | Ganancia |
+| Resolución | CPU (sin `--gpus`) | GPU (`--gpus all`) | Ganancia |
 |---|---|---|---|
 | 1280×720 | 8.1 fps | 15.0 fps | 1.8× |
 | 1920×1080 | 5.2 fps | 7.3 fps | 1.4× |
 
-**La GPU sólo acelera el detector.** La segmentación del pretil se ejecuta en NumPy y OpenCV
-sobre CPU y cuesta lo mismo en ambos modos: 36 ms por frame a 720p y 74 ms a 1080p. La GPU
-baja la detección de 60 a 16 ms en `video_02`, pero la aceleración extremo a extremo se queda
-en 1.8×, y a 1080p, donde el pretil pesa más, en 1.4×: la etapa que no se acelera acota la
-ganancia total.
+La GPU solo acelera el detector. La segmentación del pretil corre en NumPy y OpenCV y tarda
+lo mismo en ambos modos (36 ms por frame a 720p, 74 ms a 1080p), así que limita la ganancia
+total. De ahí salen dos cosas: el modo CPU es usable (8 fps a 720p), y optimizar el detector
+serviría poco; lo que rendiría es llevar el pretil a GPU o bajarle la resolución. El
+desglose por etapa está en la sección 5 del reporte.
 
-Tiene dos consecuencias prácticas. La primera es que **el modo CPU es perfectamente utilizable**
-—8 fps a 720p y 5 fps a 1080p—, lo que respalda la decisión del ADR 0001 de degradar en
-vez de exigir GPU. La segunda es que optimizar el detector sin tocar la rama de terreno daría
-un retorno marginal; el trabajo rendidor sería llevar la búsqueda de camino óptimo a GPU o
-reducir su resolución de trabajo. El desglose por etapa y las condiciones de la medición están
-en la sección 5 de `reporte_benchmark.md`.
-
-La imagen pesa 15.7 GB, dominada por la base CUDA y las librerías de NVIDIA que arrastra
-PyTorch. Es el costo de un despliegue con GPU disponible sin descargas en tiempo de ejecución.
+La imagen pesa 15.7 GB, casi todo por la base CUDA y las librerías de NVIDIA que trae
+PyTorch.
 
 ---
 
 ## Estado y limitaciones
 
-Esta sección declara qué funciona, qué no, y por qué. Es deliberadamente explícita.
-
 ### Funciona
 
-- **Ejecución extremo a extremo** sobre un directorio arbitrario, con resolución y tasa de
-  frames heterogéneas. Un video ilegible se registra en `run_metadata.json` y no interrumpe
-  el lote.
-- **Detección de CAEX** con recall de 1.000 y mAP@0.5 de 0.812 sobre el conjunto de
-  validación.
-- **Separación de máquinas contiguas** en cajas independientes, que es la condición necesaria
-  para medir proximidad. El modelo preentrenado las fusionaba en una sola caja.
-- **Segmentación del pretil** con cobertura en torno al 60 % de las columnas, con continuidad
-  garantizada por construcción.
-- **Segmentación por tomas** y clasificación lumínica por frame.
+- Procesa una carpeta cualquiera de videos, con distintas resoluciones y FPS. Si un video no
+  se puede leer, queda registrado en `run_metadata.json` y el resto sigue.
+- Detecta los CAEX con recall 1.000 y mAP@0.5 de 0.812 en validación.
+- Separa en cajas distintas las máquinas que están juntas, que es lo que se necesita para
+  medir proximidad. El modelo COCO las juntaba en una sola caja.
+- Detecta los cortes de escena y clasifica la luz de cada frame.
+- Traza un perfil continuo del pretil y mide su altura con una incertidumbre explícita.
 
-### No funciona, y por qué
+### Lo que no funciona o tiene límites
 
-**La clase `bulldozer` está aprendida pero es frágil.** mAP@0.5 de 0.306 y recall de 0.455,
-frente a 0.812 y 1.000 para `caex`. Al umbral de operación de 0.25 la clase minoritaria casi no
-se emite, de modo que en la práctica el OSD etiqueta toda máquina como `caex`. **Las etiquetas
-de clase de los artefactos no deben interpretarse como identificación de tipo de equipo.**
-
-**El detector sobre-detecta.** La precisión sobre `caex` es de 0.297 con recall 1.000: encuentra
-todos los camiones, pero cerca del 70 % de sus detecciones no corresponde a ninguno. Cada falso
-positivo será una entidad fantasma para el módulo de proximidad, y por tanto una alerta espuria
-potencial.
-
-Ambos síntomas tienen la misma causa, y es de datos: 33 instancias de bulldozer en
-entrenamiento frente a 270 de CAEX. El análisis completo está en
-[`docs/resultados_deteccion.md`](docs/resultados_deteccion.md).
-
-**La segmentación del pretil se mide por estabilidad, no por exactitud.** No hay ground
-truth anotado del perfil, de modo que el jitter temporal y el costo son comparables entre
-métodos pero el error absoluto de la cresta no se conoce. Es la limitación central del
-`reporte_benchmark.md`.
-
-**La altura absoluta tiene un sesgo sistemático de factor ~4** — mediana medida 0.38 m
-frente a los 1.5–2 m que referencia la normativa — y una dispersión de ±12 % atribuible
-sólo al cambio de iluminación. **No debe usarse para verificar cumplimiento normativo.**
-En términos relativos, detectar que el pretil se degrada respecto a su propia línea base
-sí es confiable, porque un factor de escala constante se cancela en la comparación.
-
-**El pretil no se delinea con fiabilidad en toda la escena.** El material presenta contraste
-bajo entre el banco de tierra y el suelo circundante, y textura de primer plano —huellas de
-neumático, sombras largas— cuya respuesta de gradiente supera a la de la propia cresta. De
-noche la curva se confundía además con el horizonte iluminado del fondo; el ADR 0007 lo
-corrigió anclando la búsqueda a la maquinaria, pero donde la región de búsqueda no contiene un
-borde claro el camino baja hasta su límite inferior. La cobertura no sirve para cuantificar
-nada de esto: resultó dominada por el umbral de validación y no por la escena. Las
-alternativas probadas y descartadas están en los ADR 0006 y 0007.
-
-**Sin calibración de cámara no hay medición métrica confiable.** Una imagen no contiene escala:
-un pretil de dos metros cerca y uno de seis lejos ocupan los mismos píxeles. El ancla
-disponible son las dimensiones nominales de la maquinaria detectada, lo que traslada al
-resultado el error de la caja y la dispersión del supuesto.
-
-**El rendimiento no es de tiempo real en 1080p.** La segmentación del pretil cuesta unos
-120 ms por frame a esa resolución, comparable o superior a la inferencia del detector. Es el
-precio de una búsqueda global sobre toda la rejilla.
-
-**Los umbrales están calibrados sobre el material de muestra.** Los cortes de clasificación
-lumínica y el umbral de detección de cortes se ajustaron sobre cuatro clips. El conjunto de
-evaluación es ciego: su generalización es un supuesto declarado, no un hecho verificado. Todos
-los umbrales son configurables en `configs/`.
-
-**Anotador único.** El conjunto de entrenamiento y validación lo anotó una sola persona, sin
-acuerdo entre anotadores. Las métricas arrastran una incertidumbre propia no cuantificada.
+- **La clase `bulldozer` es débil**: mAP@0.5 de 0.306 y recall 0.455. Con el umbral de 0.25
+  casi no aparece, así que en la práctica el OSD marca todo como `caex`. Las etiquetas de
+  clase no deben leerse como el tipo de equipo.
+- **El detector sobre-detecta**: precisión 0.297 en `caex`. Encuentra todos los camiones,
+  pero ~70 % de sus cajas son falsas, y eso genera alertas de proximidad espurias que el
+  tracker solo mitiga en parte. Las dos cosas vienen de lo mismo: 33 bulldozers contra 270
+  CAEX en entrenamiento (ver [`docs/resultados_deteccion.md`](docs/resultados_deteccion.md)).
+- **El pretil se evalúa por estabilidad, no por exactitud.** No tengo el perfil real
+  anotado, así que puedo comparar el jitter y el costo entre métodos pero no el error de la
+  cresta.
+- **La altura absoluta está sesgada** por un factor cercano a 4: la mediana es 0.38 m y la
+  normativa habla de 1.5–2 m. Además varía ±12 % solo por la luz. No sirve para verificar
+  cumplimiento. Sí sirve para detectar que el pretil baja respecto de sí mismo, porque un
+  error de escala constante se cancela.
+- **El pretil no se traza bien en toda la escena.** Tiene poco contraste, y las huellas de
+  neumático del primer plano dan más gradiente que la cresta. De noche la curva se iba al
+  horizonte; el ADR 0007 lo corrigió, pero donde no hay un borde claro la curva baja al
+  límite inferior de la banda de búsqueda.
+- **Sin calibración de cámara, la escala depende de la maquinaria.** Uso el ancho nominal
+  del CAEX como referencia, así que los errores de la caja pasan a la medición.
+- **Los umbrales se ajustaron con cuatro videos.** Los de luz, cortes y campo de visión
+  están en `configs/`. No sé cómo se comportan con videos nuevos.
+- **Anoté yo solo.** No hay acuerdo entre anotadores, así que las métricas de detección
+  tienen una incertidumbre que no medí.
 
 ---
 
 ## Desarrollo local
 
-Requiere Python 3.10, la misma versión que trae Ubuntu 22.04 dentro de la imagen.
+Python 3.10, la misma versión que usa la imagen (Ubuntu 22.04).
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
 
-# Torch primero y desde el indice de CUDA: instalarlo despues de ultralytics
-# arrastra la compilacion de CPU desde PyPI.
+# Torch primero y desde el índice de CUDA; si se instala después de ultralytics,
+# pip trae la versión de CPU.
 pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
 pip install -r requirements.txt
 pip install -e . --no-deps
@@ -248,7 +201,7 @@ pip install -e . --no-deps
 python main.py --input data/raw --output output --method 1
 ```
 
-### Calidad
+Calidad:
 
 ```bash
 ruff check . && ruff format --check .
@@ -256,37 +209,32 @@ mypy bermguard/
 pytest
 ```
 
-### Herramientas de desarrollo
+`scripts/` tiene herramientas que no son parte del pipeline, pero con las que generé la
+evidencia de `docs/`:
 
-`scripts/` contiene utilidades que no forman parte del pipeline y que documentan cómo se
-construyó. Producen la evidencia citada en `docs/`.
-
-| Script | Qué produce |
+| Script | Para qué |
 |---|---|
-| `probe_videos.py` | Caracterización del material: resolución, cortes, luminancia |
-| `probe_detector.py` | Histograma de clases que dispara un detector preentrenado |
-| `probe_openvocab.py` | Evaluación del enfoque zero-shot con prompts de texto |
-| `prepare_labeling_set.py` | Extracción estratificada de frames para anotar |
-| `split_dataset.py` | Partición por video, no aleatoria |
-| `train_detector.py` | Fine-tuning del detector |
+| `probe_videos.py` | Mide resolución, cortes y luminancia del material |
+| `probe_detector.py` | Cuenta qué clases dispara el detector COCO |
+| `probe_openvocab.py` | Prueba el detector zero-shot con prompts de texto |
+| `prepare_labeling_set.py` | Extrae frames para anotar, estratificados por luz |
+| `split_dataset.py` | Separa entrenamiento y validación por video |
+| `train_detector.py` | Entrena el detector |
+| `eval_detector.py` | Calcula las métricas por clase |
 
 ---
 
 ## Trabajo futuro
 
-En orden de impacto esperado sobre las limitaciones declaradas:
+Ordenado por impacto:
 
-1. **Etiquetado dirigido de bulldozer.** Es la limitación dominante y la más barata de
-   atacar: extraer frames restringidos a los tramos donde la máquina es visible y anotar unas
-   sesenta más duplicaría la clase minoritaria en cerca de una hora.
-2. **Calibración de cámara.** Un tablero de ajedrez, o los metadatos de montaje —focal, altura,
-   ángulo—, llevarían el error de la medición de altura de un orden de ±20 % a menos del 5 %.
-3. **Reportar la altura de forma adimensional**, como cociente entre la altura del pretil y el
-   radio de rueda del equipo mayor. La normativa define el criterio de cumplimiento
-   exactamente en esos términos, y el cociente cancela el sesgo global de escala, que es la
-   fuente dominante de error.
-4. **Segmentación neural del pretil** como Método 2, para contrastar contra el prior
-   geométrico explícito.
-5. **Exportación a ONNX Runtime** y medición del speedup frente a PyTorch en FP32 y FP16.
-6. **Monitoreo de deriva en producción:** si la distribución de confianzas del detector cae,
-   alertar antes de que el sistema falle en silencio.
+1. **Anotar más bulldozers.** Es la limitación principal y la más barata: unas sesenta
+   anotaciones más duplicarían la clase en cerca de una hora.
+2. **Calibrar la cámara**, con un tablero de ajedrez o los datos de montaje, para bajar el
+   error de la altura.
+3. **Reportar la altura relativa al radio de rueda** del equipo mayor, que es como la
+   normativa define el criterio y además cancela el error de escala.
+4. **Un segmentador neural del pretil** como Método 2, para compararlo con el enfoque
+   geométrico.
+5. **Exportar a ONNX Runtime** y medir la ganancia frente a PyTorch en FP32 y FP16.
+6. **Vigilar la deriva en producción**: alertar si la confianza del detector empieza a caer.

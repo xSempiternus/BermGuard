@@ -1,22 +1,19 @@
-# Resultados del detector especializado
+# Resultados del detector
 
-Análisis del fine-tuning decidido en el ADR 0002 y ejecutado con los datos del ADR 0004.
-
-Reproducible con:
+Resultados del fine-tuning (ADR 0002) con los datos del ADR 0004.
 
 ```bash
 python scripts/split_dataset.py data/export --out data/dataset --val video_04
 python scripts/train_detector.py --data data/dataset/data.yaml --epochs 80
+python scripts/eval_detector.py
 ```
 
-Artefactos en `docs/entrenamiento/`. Pesos entregados en `weights/detector_v1.pt`.
+Las curvas y métricas del entrenamiento están en `docs/entrenamiento/`, y los pesos en
+`weights/detector_v1.pt`.
 
----
+## 1. Datos
 
-## 1. Conjunto de entrenamiento
-
-171 frames anotados a mano, extraídos del material de muestra con muestreo estratificado por
-condición lumínica y separados por video para la partición.
+171 frames anotados a mano, estratificados por condición de luz y separados por video.
 
 | Partición | Imágenes | `caex` | `bulldozer` |
 |---|---|---|---|
@@ -24,152 +21,88 @@ condición lumínica y separados por video para la partición.
 | val (`video_04` completo) | 40 | 39 | 11 |
 | **Total** | **171** | **309** | **44** |
 
-**El desbalance de clases es de 7:1, y la clase minoritaria tiene 44 instancias en todo el
-conjunto.** No es una consecuencia del muestreo sino del material: en `video_01` hay cuatro o
-cinco CAEX simultáneos y un solo bulldozer, y en los otros clips el bulldozer aparece más
-pequeño, más ocluido por el polvo y con frecuencia fuera de cuadro.
+**Hay 7 CAEX por cada bulldozer**, y solo 44 bulldozers en total. Viene del material: en
+`video_01` hay cuatro o cinco CAEX a la vez y un solo bulldozer, y en los otros clips el
+bulldozer se ve más chico, tapado por el polvo o fuera de cuadro.
 
-La partición es por video y no aleatoria. Con partición aleatoria, dos frames separados por
-seis posiciones —misma escena, misma luz, máquinas casi en la misma posición— caerían a lados
-distintos, y la métrica de validación premiaría la memorización. Reservar un clip íntegro mide
-lo que interesa: el comportamiento sobre material no visto.
-
-La validación se asignó a `video_04` y no a `video_03` tras comprobar que este último aporta
-sólo 4 instancias de bulldozer. Un mAP calculado sobre 4 objetos no es una medición: fallar uno
-lo mueve un 25 %.
+Separé por video y no al azar porque dos frames a seis posiciones de distancia son casi la
+misma imagen, y con una partición aleatoria la validación premiaría memorizar. Dejé
+`video_04` para validación y no `video_03` porque este solo tiene 4 bulldozers: con 4
+objetos, fallar uno mueve el resultado un 25 %.
 
 ## 2. Entrenamiento
 
-Partiendo de `yolo11s.pt` (preentrenado en COCO), 80 épocas solicitadas, `batch=8`,
-`imgsz=640`, precisión mixta, semilla fija en 0.
+Desde `yolo11s.pt` (COCO), con un máximo de 80 épocas, `batch=8`, `imgsz=640`, precisión
+mixta y semilla 0. Se detuvo por paciencia en la época 42 y la mejor fue la 22. Cerca de la
+época 6 el mAP cayó a 0.002 y se recuperó, algo típico con pocos datos para el tamaño del
+modelo.
 
-El entrenamiento se detuvo por paciencia en la **época 42**, con el mejor resultado en la
-**época 22**. La curva muestra un colapso transitorio alrededor de la época 6 —el mAP cae a
-0.002 y se recupera— característico de un conjunto pequeño frente a la capacidad del modelo.
-
-## 3. Métricas globales
-
-| Métrica | Valor |
-|---|---|
-| mAP@0.5 | 0.559 |
-| mAP@0.5:0.95 | 0.388 |
-
-Para calibrar: un detector bien entrenado sobre un conjunto amplio y limpio se sitúa entre
-0.80 y 0.90 de mAP@0.5. El resultado es moderado y consistente con 131 imágenes de
-entrenamiento.
-
-## 4. El resultado que el promedio esconde
-
-El desglose por clase sobre el conjunto de validación:
+## 3. Métricas
 
 | Clase | mAP@0.5 | mAP@0.5:0.95 | Precisión | Recall |
 |---|---|---|---|---|
 | `caex` | 0.812 | 0.585 | 0.297 | **1.000** |
 | `bulldozer` | **0.306** | 0.188 | 0.464 | 0.455 |
+| global | 0.559 | 0.387 | 0.381 | 0.727 |
 
-**El mAP global de 0.559 describe dos comportamientos muy distintos promediados.** La clase
-mayoritaria alcanza 0.812, un valor utilizable; la minoritaria se queda en 0.306, que no lo es.
-Reportar sólo la cifra global habría ocultado exactamente el problema que este entrenamiento
-existía para resolver.
+El mAP global de 0.559 es moderado (un detector bien entrenado con muchos datos anda entre
+0.80 y 0.90), pero promedia dos cosas muy distintas: `caex` en 0.812, que es usable, y
+`bulldozer` en 0.306, que no lo es. Si reportara solo el global, escondería el problema
+principal.
 
-### Una discrepancia que conviene explicar
+### La matriz de confusión y el mAP no se contradicen
 
-La matriz de confusión que genera el entrenamiento
-(`docs/entrenamiento/confusion_matrix_normalized.png`) muestra la fila de `bulldozer`
-completamente vacía, como si el modelo nunca predijera esa clase. El mAP de 0.306 dice que sí
-la predice.
+La matriz de confusión (`docs/entrenamiento/confusion_matrix_normalized.png`) muestra la
+fila de `bulldozer` vacía, como si nunca se predijera, pero el mAP es 0.306. La diferencia
+es el umbral: la matriz usa un umbral de confianza fijo y el mAP recorre todos. El modelo sí
+predice `bulldozer`, pero casi siempre bajo 0.25, el umbral de `configs/method_1.yaml`, así
+que en operación casi no aparece. La clase está aprendida, aunque débil.
 
-Ambas cosas son ciertas y la diferencia está en el umbral. La matriz de confusión se calcula a
-un **umbral de confianza fijo**, mientras el mAP integra la curva precisión-recall **sobre todos
-los umbrales**. La lectura conjunta es que el modelo emite predicciones de `bulldozer`, pero
-casi todas por debajo del umbral de operación: a 0.25 —el valor que fija
-`configs/method_1.yaml`— prácticamente desaparecen.
+### Precisión baja en `caex`
 
-Es una distinción con consecuencia práctica: la clase está aprendida, aunque débilmente, y no
-ausente. Bajar el umbral la haría aparecer, a costa de los falsos positivos que se describen
-abajo. Y es un recordatorio de que una métrica agregada y una matriz de confusión no responden
-la misma pregunta.
+`caex` tiene recall 1.000 y precisión 0.297: encuentra todos los camiones, pero ~70 % de sus
+cajas no corresponden a ninguno. Con el NMS por defecto (0.7) salen cuatro cajas solapadas
+por escena. El `iou=0.45` de la configuración quita buena parte, pero quedan falsos
+positivos sobre terreno y polvo.
 
-### El problema de precisión, que no estaba previsto
+Cada falso positivo es un equipo fantasma para la proximidad, o sea, una posible falsa
+alarma. El tracker lo mitiga exigiendo 3 detecciones seguidas antes de confirmar un track y
+suprimiendo cajas duplicadas (reporte, sección 7).
 
-`caex` tiene **recall 1.000 con precisión 0.297**: el modelo encuentra todos los camiones del
-conjunto de validación, pero cerca del 70 % de sus detecciones no corresponde a ninguno.
+## 4. Aun así, resolvió el problema
 
-Sobre-detecta. Es coherente con lo observado al inspeccionar frames sueltos: con el umbral de
-NMS por defecto de Ultralytics (0.7) el modelo emite cuatro cajas solapadas sobre la misma
-escena. El `iou=0.45` de la configuración recorta buena parte de esa duplicación, pero la
-precisión medida indica que quedan falsos positivos sobre terreno y polvo.
-
-Tiene una consecuencia aguas abajo que hay que declarar: **cada falso positivo es una entidad
-fantasma para el módulo de proximidad**, y por tanto una fuente de alertas espurias. Un
-sistema de seguridad que alerta sin causa produce fatiga de alarma, que es el mismo problema
-que la histéresis existe para evitar. Mitigarlo pasa por subir el umbral de confianza —a costa
-del recall de `bulldozer`, ya frágil— o por exigir persistencia temporal en el tracker antes de
-considerar un track como equipo real.
-
-## 5. Y sin embargo, el entrenamiento resolvió el bloqueo
-
-La razón de ser del fine-tuning (ADR 0002) no era la etiqueta, sino que el modelo COCO
-**fusionaba el CAEX y el bulldozer en una sola caja**, lo que elimina la magnitud que el módulo
-de proximidad necesita medir.
-
-Sobre el frame 120 de `video_02`, donde ambas máquinas aparecen contiguas:
+El fine-tuning no se hizo por la etiqueta, sino porque el modelo COCO juntaba el CAEX y el
+bulldozer en una caja, y sin dos entidades no hay distancia que medir. En el frame 120 de
+`video_02`:
 
 | Modelo | Detecciones | Cajas |
 |---|---|---|
-| `yolo11s` COCO | 1 | `truck` 0.74, x=[138,759], **622 px — ambas máquinas** |
-| `detector_v1` | 2 | `caex` 0.48, x=[480,765], 285 px — **el bulldozer**<br>`caex` 0.43, x=[65,614], 549 px — **el CAEX** |
+| `yolo11s` COCO | 1 | `truck` 0.74, x=[138,759], **622 px, las dos máquinas** |
+| `detector_v1` | 2 | `caex` 0.48, x=[480,765], 285 px, **el bulldozer**<br>`caex` 0.43, x=[65,614], 549 px, **el CAEX** |
 
-**Las máquinas quedan separadas.** El sistema pasa de una entidad a dos, que es la condición
-necesaria para medir distancia entre equipos.
+Las máquinas quedan separadas. Con 33 ejemplos el modelo no aprendió bien la clase
+`bulldozer`, pero entrenar con cajas separadas le enseñó a no juntar máquinas vecinas, y eso
+era lo que bloqueaba. Las dos cajas salen como `caex`, lo que calza con lo anterior.
 
-La interpretación es que el entrenamiento sobre datos del dominio, con cajas anotadas
-separadas, enseñó al modelo a **no fusionar máquinas adyacentes**, aunque 33 instancias no
-alcanzaran para aprender una categoría visual sólida. **Localización y clasificación se
-aprendieron de forma muy desigual**, y el problema bloqueante era el primero: la separación en
-entidades independientes es lo que el módulo de proximidad necesita, y la etiqueta correcta es
-deseable pero no imprescindible para medir una distancia.
+## 5. Limitaciones
 
-Nótese que en este frame ambas cajas salen como `caex`, incluida la del bulldozer. Es
-consistente con la sección 4: al umbral de operación de 0.25 la clase minoritaria casi no se
-emite.
+- **`bulldozer` es débil** (mAP@0.5 de 0.306, recall 0.455), y en operación casi todo sale
+  como `caex`. Las etiquetas de clase de la salida no identifican el tipo de equipo.
+- **`caex` sobre-detecta** (precisión 0.297).
+- Las dos cosas vienen del desbalance: 33 bulldozers contra 270 CAEX. El modelo aprende mal
+  la clase chica y, ante la duda, apuesta por la grande, lo que sube el recall y baja la
+  precisión.
+- Los 44 bulldozers y 118 de los 309 CAEX los anoté con polígono en vez de caja.
+  Ultralytics usa la caja envolvente, así que para detección no se pierde nada, pero
+  conviene usar una sola herramienta si se amplía el conjunto.
+- Anoté yo solo, sin acuerdo entre anotadores.
 
-## 6. Estado y limitaciones declaradas
+Cómo mejorarlo, de más a menos rentable:
 
-**Lo que funciona.** Recall perfecto sobre `caex` en el conjunto de validación (1.000) y
-mAP@0.5 de 0.812 para esa clase. Separación de máquinas contiguas en cajas independientes,
-que era el bloqueo del pipeline.
-
-**Lo que no, y en qué grado.**
-
-- **La clase `bulldozer` está aprendida pero es frágil**: mAP@0.5 de 0.306, recall 0.455. Al
-  umbral de operación de 0.25 casi no se emite, de modo que en la práctica el OSD etiqueta
-  toda máquina como `caex`. Las etiquetas de clase de los artefactos **no deben interpretarse
-  como identificación de tipo de equipo**.
-- **La precisión sobre `caex` es baja** (0.297): el modelo sobre-detecta, y cada falso positivo
-  se convierte en una entidad fantasma para el módulo de proximidad y por tanto en una alerta
-  espuria potencial.
-
-**Causa identificada.** 33 instancias de bulldozer en entrenamiento, frente a 270 de CAEX. Es
-un problema de datos, no de arquitectura ni de hiperparámetros. El desbalance explica ambos
-síntomas: la clase minoritaria se aprende mal, y el modelo aprende a apostar por la mayoritaria
-ante la duda, lo que infla el recall a costa de la precisión.
-
-**Nota sobre el conjunto exportado.** La validación advirtió `len(segments)=18, len(boxes)=50`:
-dieciocho anotaciones se hicieron con herramienta de polígono en lugar de caja. Ultralytics
-descarta los polígonos y usa las cajas envolventes, de modo que no hay pérdida de información
-para detección, pero conviene homogeneizar la herramienta de anotación si el conjunto se amplía.
-
-**Camino de corrección, en orden de coste-beneficio:**
-
-1. **Etiquetado dirigido.** Extraer frames restringidos a los tramos donde el bulldozer está
-   visible, reduciendo la separación mínima entre muestras, y anotar unas sesenta más. Se
-   estima que duplicaría la clase minoritaria en cerca de una hora de trabajo.
-2. **Pérdida ponderada por clase o sobremuestreo** de los frames con bulldozer, para compensar
-   el desbalance sin datos nuevos. Más barato, y de efecto más limitado.
-3. **Datos externos.** Los tres datasets públicos evaluados en el ADR 0004 se descartaron por
-   brecha de dominio. Un preentrenamiento sobre ellos seguido de afinado sobre los datos
-   propios sigue siendo una hipótesis medible, no descartada.
-
-**Métrica sin cuantificar.** El conjunto lo anotó una sola persona, sin acuerdo entre
-anotadores, de modo que estas cifras arrastran una incertidumbre propia que no se ha medido.
+1. **Anotar más bulldozers**, extrayendo frames solo de los tramos donde aparece. Unas
+   sesenta anotaciones más duplicarían la clase en cerca de una hora.
+2. **Ponderar la pérdida por clase o sobremuestrear** los frames con bulldozer. Es más
+   barato, pero con menos efecto.
+3. **Preentrenar con un dataset externo y afinar con los datos propios.** Los del ADR 0004
+   se descartaron como fuente principal, pero esta combinación sigue siendo una hipótesis
+   por probar.

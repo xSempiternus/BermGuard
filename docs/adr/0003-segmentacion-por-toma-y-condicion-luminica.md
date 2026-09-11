@@ -1,75 +1,60 @@
-# ADR 0003 — Segmentación por toma y clasificación lumínica por frame
+# ADR 0003: La toma como unidad de análisis y la luz clasificada por frame
 
-- **Estado:** aceptada
-- **Fecha:** 2026-09-07
-- **Evidencia:** `docs/analisis_material.md`, secciones 2 y 3
+- Estado: aceptada
+- Fecha: 2026-09-07
+- Evidencia: `docs/analisis_material.md`, secciones 2 y 3
 
 ## Contexto
 
-El enunciado pide una curva temporal de la altura del pretil a lo largo de la secuencia, y
-penaliza explícitamente el parpadeo. Ambas cosas presuponen continuidad temporal.
+El enunciado pide una curva de la altura del pretil en el tiempo y penaliza el parpadeo.
+Las dos cosas suponen que el video es continuo, y el material no lo es:
 
-La medición del material muestra que esa presunción no se sostiene:
+- `video_01` tiene tres tomas, con cortes en t=1.50 s y t=7.13 s, y la cámara se mueve
+  entre ellas.
+- `video_02` a `video_04` no tienen cortes, pero pasan de noche a día y de vuelta a noche
+  en diez segundos, con luminancia media entre 19 y 163.
+- La luz cambia dentro de cada archivo: entre 53 % y 57 % de los frames de los clips de
+  720p son nocturnos.
 
-- `video_01` contiene **tres tomas** separadas por cortes duros en t=1.50 s y t=7.13 s, con
-  reposicionamiento de cámara entre ellas.
-- `video_02` a `video_04` no tienen cortes, pero recorren una transición gradual noche → día
-  pleno → noche dentro de diez segundos, con la luminancia media oscilando entre 19 y 163.
-- La condición lumínica varía **dentro** de cada archivo. Entre el 53 % y el 57 % de los
-  frames de los tres clips de 720p son nocturnos.
-
-Un corte invalida las identidades de tracking, la calibración del plano de suelo y el estado
-de cualquier filtro temporal. Ignorarlo produce artefactos que parecen mediciones: tracks que
-saltan de una máquina a otra, distancias entre equipos que nunca estuvieron en la misma
-escena, y una curva de altura continua que en realidad promedia pretiles distintos.
+Un corte invalida los tracks, la estimación del plano de suelo y cualquier filtro temporal.
+Si se ignora, aparecen cosas que parecen mediciones y no lo son: tracks que saltan de una
+máquina a otra, distancias entre equipos que nunca estuvieron en la misma escena, una curva
+que promedia pretiles distintos.
 
 ## Decisión
 
-**Segmentar cada video en tomas y tratar la toma como la unidad de análisis.**
+**Dividir cada video en tomas y analizar por toma.**
 
-- Los cortes se detectan combinando salto de luminancia media entre frames consecutivos con
-  cambio estructural. El primer criterio es el que decide en este material: un corte entre
-  dos tomas de encuadre similar altera poco la estructura y mucho la exposición, de modo que
-  un detector basado sólo en diferencia estructural lo pasa por alto.
-- En cada frontera de toma, el orquestador invoca `reset()` sobre el tracker, el segmentador
-  de pretil, el estimador de altura y el analizador de proximidad. Ese método forma parte de
-  los `Protocol` correspondientes, de modo que arrastrar estado a través de un corte
-  constituye una violación de contrato y no un descuido de implementación.
-- La curva temporal de altura se reporta **por segmento**, con discontinuidad explícita en
-  los cortes, en lugar de una línea continua que uniría escenas sin relación.
+- Un corte es un salto de más de 20 unidades de luminancia media entre frames seguidos
+  (`bermguard/vision/shots.py`). Los cortes de `video_01` superan ese valor con holgura y
+  las transiciones graduales se mueven unas pocas unidades por frame.
+- En cada corte el orquestador llama a `reset()` en el tracker, el segmentador, el
+  estimador de altura y la proximidad. `reset()` es parte de las interfaces, así que
+  arrastrar estado entre tomas rompe el contrato.
+- La curva de altura se corta en cada cambio de toma en vez de unir escenas distintas.
 
-**Clasificar la condición lumínica por frame, no por archivo**, en `day`, `dusk` o `night`
-según la luminancia media.
+**Clasificar la luz por frame** en `day`, `dusk` o `night` según la luminancia media:
 
-- Es la unidad correcta, porque la condición cambia dentro del archivo.
-- Es el estratificador del benchmark: todas las métricas se reportan desglosadas por
-  condición, ya que un promedio global quedaría dominado por el caso nocturno mientras
-  aparenta describir el sistema completo.
-- Es además la señal que gobierna el acondicionamiento adaptativo del frame previo a la
-  inferencia.
+- Es la unidad correcta, porque la luz cambia dentro del archivo.
+- Permite desglosar las métricas por condición. Un promedio global lo dominaría la noche.
+- Es la misma señal que ajusta el realce de contraste de la rama del pretil.
 
-## Alternativas consideradas
+## Alternativas descartadas
 
-**Tratar cada archivo como una toma continua.** Es el supuesto por defecto y el que produce
-los artefactos descritos. Se descarta por medición directa, no por principio.
-
-**Detectar cortes sólo por cambio estructural** (el criterio de escena convencional). Se
-probó sobre este material y no detecta las transiciones de `video_02` a `video_04`, además de
-depender de un umbral que en `video_01` marca dos de tres cortes de forma marginal. La
-luminancia resultó ser la señal discriminante acá.
-
-**Etiquetar la condición lumínica a nivel de archivo.** Descartada porque ningún archivo tiene
-una condición única: el más homogéneo, `video_01`, reparte 58 % día, 30 % noche y 12 %
-crepúsculo.
+- **Tratar cada archivo como una toma continua.** Es lo habitual y produce los errores
+  descritos arriba.
+- **Detectar cortes por cambio estructural**, como los detectores de escena habituales. En
+  este material los cortes son entre tomas de encuadre parecido, que cambian poco la
+  estructura y mucho la exposición; en `video_01` dos de los tres cortes quedaban justo en
+  el umbral.
+- **Clasificar la luz por archivo.** Ningún archivo tiene una sola condición. El más
+  parejo, `video_01`, tiene 58 % día, 30 % noche y 12 % crepúsculo.
 
 ## Consecuencias
 
-- Una toma corta deja poco material para estimar el plano de suelo y la escala. Cuando la
-  evidencia no alcanza, el estimador devuelve ausencia de medición en lugar de un valor
-  extrapolado desde una toma anterior.
-- La curva de altura presenta huecos en los cortes. Es el comportamiento correcto y se
-  documenta como tal: un hueco declarado informa más que una interpolación que oculta que
-  la escena cambió.
-- Los cortes de clasificación lumínica se fijan en `configs/` y son revisables. Están
-  calibrados sobre el material de muestra, y el set de evaluación es ciego, de modo que su
-  generalización es un supuesto declarado y no un hecho verificado.
+- Una toma corta da poca información para estimar la escala. Si no alcanza, la altura queda
+  vacía en vez de arrastrarse desde la toma anterior.
+- La curva de altura tiene huecos en los cortes. Es lo correcto: el hueco avisa que la
+  escena cambió.
+- Los umbrales de luz están en `configs/` y los ajusté con el material de muestra. No sé
+  cómo se comportan con los videos de evaluación.
