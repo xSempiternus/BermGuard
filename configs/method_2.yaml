@@ -5,7 +5,7 @@
 # fracaso motivo la formulacion por camino optimo del metodo 1.
 #
 # Se conserva como linea base medible: sin ella, "el camino optimo es mejor" seria
-# una opinion en vez de un 39 % menos de jitter a 1.56x el costo. El eje del
+# una opinion en vez de un 44 % menos de jitter a 1.44x el costo. El eje del
 # benchmark es donde se impone el prior de continuidad — durante la busqueda o
 # despues, mediante filtrado.
 #

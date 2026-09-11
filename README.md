@@ -104,6 +104,7 @@ consideradas y sus consecuencias.
 | [0004](docs/adr/0004-datos-de-entrenamiento-del-dominio.md) | Datos propios anotados por sobre tres datasets públicos evaluados |
 | [0005](docs/adr/0005-el-detector-opera-sobre-frames-crudos.md) | El detector no ve acondicionamiento de imagen; la rama de terreno sí |
 | [0006](docs/adr/0006-segmentacion-del-pretil-por-camino-optimo.md) | La cresta del pretil como camino óptimo, no como `argmax` por columna |
+| [0007](docs/adr/0007-banda-del-pretil-anclada-a-la-maquinaria.md) | La banda de búsqueda del pretil se ancla a la maquinaria por arriba, para no confundirlo con el horizonte |
 
 Documentos de respaldo:
 
@@ -132,7 +133,9 @@ modos, con CUDA como camino declarado y la degradación a CPU como seguro.
 ## Rendimiento medido
 
 Ejecutando el comando de referencia dentro del contenedor, sobre el material de muestra.
-Hardware: RTX 3050 Ti Laptop (4 GB) e Intel de portátil.
+Hardware: RTX 3050 Ti Laptop (4 GB) e Intel de portátil. Las cifras corresponden a la imagen
+construida antes del ADR 0007, que estrechó la banda de búsqueda del pretil; los tiempos por
+etapa posteriores a ese cambio, medidos en el host, están en `reporte_benchmark.md`.
 
 | Resolución | Sin `--gpus` (CPU) | Con `--gpus all` | Ganancia |
 |---|---|---|---|
@@ -193,16 +196,20 @@ truth anotado del perfil, de modo que el jitter temporal y el costo son comparab
 métodos pero el error absoluto de la cresta no se conoce. Es la limitación central del
 `reporte_benchmark.md`.
 
-**La altura absoluta tiene un sesgo sistemático de factor ~3** — mediana medida 0.49 m
-frente a los 1.5–2 m que referencia la normativa — y una dispersión de ±26 % atribuible
+**La altura absoluta tiene un sesgo sistemático de factor ~4** — mediana medida 0.38 m
+frente a los 1.5–2 m que referencia la normativa — y una dispersión de ±12 % atribuible
 sólo al cambio de iluminación. **No debe usarse para verificar cumplimiento normativo.**
 En términos relativos, detectar que el pretil se degrada respecto a su propia línea base
 sí es confiable, porque un factor de escala constante se cancela en la comparación.
 
-**El pretil no se delinea completo.** La cobertura media ronda el 60 % de las columnas. El
-material presenta contraste bajo entre el banco de tierra y el suelo circundante, y textura de
-primer plano —huellas de neumático, sombras largas— cuya respuesta de gradiente supera a la de
-la propia cresta. Las alternativas probadas y descartadas están en el ADR 0006.
+**El pretil no se delinea con fiabilidad en toda la escena.** El material presenta contraste
+bajo entre el banco de tierra y el suelo circundante, y textura de primer plano —huellas de
+neumático, sombras largas— cuya respuesta de gradiente supera a la de la propia cresta. De
+noche la curva se confundía además con el horizonte iluminado del fondo; el ADR 0007 lo
+corrigió anclando la búsqueda a la maquinaria, pero donde la región de búsqueda no contiene un
+borde claro el camino baja hasta su límite inferior. La cobertura no sirve para cuantificar
+nada de esto: resultó dominada por el umbral de validación y no por la escena. Las
+alternativas probadas y descartadas están en los ADR 0006 y 0007.
 
 **Sin calibración de cámara no hay medición métrica confiable.** Una imagen no contiene escala:
 un pretil de dos metros cerca y uno de seis lejos ocupan los mismos píxeles. El ancla

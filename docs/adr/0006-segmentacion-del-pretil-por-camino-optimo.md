@@ -4,6 +4,10 @@
 - **Fecha:** 2026-09-09
 - **Evidencia:** `docs/analisis_material.md`, sección 1
 - **Implementación:** `bermguard/vision/berm/classical.py`
+- **Modificado por:** ADR 0007 — la banda de búsqueda descrita aquí se acota ahora
+  también por arriba, porque de noche el camino se confundía con el horizonte. Las cifras
+  de jitter de este documento son anteriores a ese cambio; las vigentes están en
+  `reporte_benchmark.md`.
 
 ## Contexto
 

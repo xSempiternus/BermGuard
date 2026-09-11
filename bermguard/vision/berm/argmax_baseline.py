@@ -36,6 +36,7 @@ from scipy.ndimage import median_filter
 from scipy.signal import savgol_filter
 
 from bermguard.core.types import BermPixels, Detection, FloatArray, ImageBGR
+from bermguard.vision.berm.band import search_band
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class ArgmaxBermSegmenter:
         sky_variance_threshold: float = 6.0,
         band_margin_frac: float = 0.04,
         box_dilation_px: int = 12,
+        vehicle_height_multiple: float = 1.0,
     ) -> None:
         """
         Args:
@@ -83,6 +85,7 @@ class ArgmaxBermSegmenter:
         self._sky_threshold = sky_variance_threshold
         self._band_margin = band_margin_frac
         self._box_dilation = box_dilation_px
+        self._vehicle_height_multiple = vehicle_height_multiple
 
     @property
     def name(self) -> str:
@@ -114,14 +117,15 @@ class ArgmaxBermSegmenter:
                 max(0, int(x1) - d) : min(ancho, int(x2) + d),
             ] = 0.0
 
-        varianza = realzado.std(axis=1)
-        con_textura = np.flatnonzero(varianza > self._sky_threshold)
-        y_min = int(con_textura[0]) if con_textura.size else 0
-        if detections:
-            rasante = max(det.bbox.ground_point[1] for det in detections)
-            y_max = int(min(alto, rasante + alto * self._band_margin))
-        else:
-            y_max = int(alto * 0.80)
+        # Misma banda que el Metodo 1, del modulo compartido: la comparacion del
+        # benchmark solo es valida si ambos buscan en la misma region.
+        y_min, y_max = search_band(
+            realzado,
+            detections,
+            sky_variance_threshold=self._sky_threshold,
+            band_margin_frac=self._band_margin,
+            vehicle_height_multiple=self._vehicle_height_multiple,
+        )
         if y_max - y_min < 16:
             return None
 

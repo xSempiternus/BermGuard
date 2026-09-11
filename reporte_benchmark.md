@@ -40,8 +40,8 @@ Cada `metadata.json` registra qué método lo produjo y con qué resultado. Sobr
 | Campo | `method_1` | `method_2` |
 |---|---|---|
 | `method_name` | Prior geométrico | Línea base por argmax |
-| `berm_crest_jitter_px` | **17.34** | 24.11 |
-| `average_fps` | 13.1 | **16.6** |
+| `berm_crest_jitter_px` | **9.94** | 17.46 |
+| `average_fps` | 12.7 | **17.2** |
 | `proximity_alerts` | 12 | 12 |
 
 Los números difieren porque los métodos difieren; las alertas coinciden porque el
@@ -232,44 +232,82 @@ más.
 
 | | Método 1 (camino óptimo) | Método 2 (argmax + filtro) |
 |---|---|---|
-| **Jitter de la cresta** | **20.03 px** | 32.84 px |
-| Cobertura media | 93.6 % | 90.6 % |
-| Costo de la etapa | 55.9 ms/frame | **35.9 ms/frame** |
-| Pipeline completo | 11.6 fps | **14.6 fps** |
-| ms/frame (p95) | 102.3 | 81.7 |
-| Altura mediana | 0.48 m | 0.49 m |
+| **Jitter de la cresta** | **14.57 px** | 26.17 px |
+| Cobertura media | 89.3 % | 86.5 % |
+| Costo de la etapa | 55.0 ms/frame | **38.1 ms/frame** |
+| Pipeline completo | 10.7 fps | **13.9 fps** |
+| ms/frame (p95) | 117.7 | 97.8 |
+| Altura mediana | 0.38 m | 0.37 m |
 
-**El trade-off es explícito: el Método 1 reduce el jitter un 39 % a cambio de 1.56× el
+**El trade-off es explícito: el Método 1 reduce el jitter un 44 % a cambio de 1.44× el
 costo.** Ambas cifras son consecuencia directa de la formulación. La búsqueda de camino
 óptimo evalúa toda la rejilla con una restricción de continuidad, lo que cuesta más y
 produce un perfil que no puede saltar; el `argmax` decide cada columna en una operación
 trivial y el filtrado posterior sólo atenúa lo que ya se rompió.
 
-Las alturas medianas coinciden (0.48 vs 0.49 m) porque ambos alimentan el mismo
+Las cifras son posteriores al ADR 0007, y los tiempos de ambos métodos provienen de la
+misma corrida, sin otros procesos compitiendo por la GPU: la comparación entre ellos es
+válida. No se comparan con los tiempos de corridas anteriores, que se hicieron en
+sesiones distintas de un equipo portátil donde la variación entre sesiones es real.
+
+Las alturas medianas coinciden (0.38 vs 0.37 m) porque ambos alimentan el mismo
 estimador métrico. Lo que cambia no es el valor central sino su estabilidad.
 
-### 4.2 Desglose por condición lumínica, y una inversión
+### 4.2 Desglose por condición lumínica, y una inversión que resultó ser un artefacto
 
 | Condición | Jitter M1 (px) | Jitter M2 (px) | n |
 |---|---|---|---|
-| día | **17.87** | 39.12 | 424 |
-| crepúsculo | **28.00** | 59.89 | 94 |
-| noche | 22.10 | **17.58** | 473 |
+| día | **15.30** | 30.26 | 424 |
+| crepúsculo | **17.04** | 42.35 | 94 |
+| noche | **19.21** | 33.46 | 473 |
 
-De día y en crepúsculo el Método 1 es 2.2× más estable. **De noche la relación se
-invierte.**
+El Método 1 es más estable en las tres condiciones: 2.0× de día, 2.5× en crepúsculo y
+1.7× de noche.
 
-La lectura no es que el `argmax` sea mejor de noche. Es que **el jitter mide
-estabilidad, no exactitud.** La inspección visual de los frames nocturnos muestra que
-la curva se engancha a los penachos de polvo iluminados por los faros, que son
-estructuras de gradiente muy fuerte y **espacialmente fijas** durante varios frames. Un
-`argmax` que se bloquea sobre el mismo máximo local frame tras frame produce jitter
-bajo y una respuesta consistentemente equivocada.
+#### La inversión nocturna, y el experimento que la explicó
 
-Sin ground truth **no se puede distinguir «estable y correcto» de «estable y
-equivocado»**, y esa es la limitación central de este eje. Reportar el 17.58 nocturno
-como una victoria del Método 2 sería exactamente el error que este reporte trata de no
-cometer.
+La primera medición de este eje decía otra cosa: de noche el Método 2 parecía el más
+estable, con 17.58 px contra 22.10. La lectura que se registró entonces fue que eso no lo
+hacía mejor, porque **el jitter mide estabilidad, no exactitud**: un `argmax` que se
+bloquea frame tras frame sobre el mismo máximo local produce jitter bajo y una respuesta
+consistentemente equivocada. Sin ground truth no había forma de distinguir «estable y
+correcto» de «estable y equivocado».
+
+La revisión visual de los videos nocturnos identificó el objetivo equivocado. No eran
+principalmente los penachos de polvo iluminados, como suponía la primera versión de este
+reporte, sino **la frontera entre el terreno oscuro y el valle iluminado del fondo**, que
+es el borde horizontal más fuerte de la escena nocturna y quedaba dentro de la banda de
+búsqueda. El ADR 0007 corrigió la banda anclándola a la maquinaria también por arriba, y
+con ello sacó ese borde de la región posible.
+
+El resultado es el experimento que valida la hipótesis:
+
+| Noche | Antes del ADR 0007 | Después |
+|---|---|---|
+| Método 1 | 22.10 px | 19.21 px |
+| Método 2 | **17.58 px** | **33.46 px** |
+
+Sin el horizonte a su alcance, el jitter nocturno del Método 2 **casi se duplica**: su
+estabilidad anterior era la de estar anclado a un objetivo equivocado. La hipótesis se
+planteó sin ground truth y se verificó con un cambio controlado, que es lo más cerca de una
+medición de exactitud a que llega este reporte.
+
+La corrección no es gratuita, y dejó dos defectos a la vista:
+
+- Donde la banda no contiene un borde claro —junto al camión, en el frame nocturno de
+  referencia— el camino baja hasta el límite inferior de la banda en lugar de seguir una
+  estructura.
+- Cuando el detector emite una caja demasiado grande, el límite inferior de la banda se
+  desplaza hacia el primer plano. En el frame 130 de `video_04` la caja del CAEX llega a la
+  fila 664, la banda se extiende hasta la 693, y la curva se asienta sobre las huellas de
+  neumático del primer plano en lugar de sobre el banco que está detrás del bulldozer. Antes
+  del ADR 0007 el error de ese mismo frame iba hacia arriba, hacia la llanura del fondo;
+  ahora va hacia abajo.
+
+El segundo es la interacción de dos limitaciones ya declaradas —la precisión del detector y
+la dominancia del gradiente del primer plano—, y es un recordatorio de lo que advierte la
+propia sección: un jitter menor es un perfil más estable, no uno más correcto. Ambos
+defectos están descritos en el ADR 0007.
 
 ### 4.3 La cobertura no es una métrica utilizable
 
@@ -290,11 +328,17 @@ Que la cifra sea **insensible a la condición lumínica**, cuando el contraste v
 órdenes de magnitud entre día y noche, es la señal de que mide el umbral y no la escena.
 Se reporta con esta advertencia en lugar de presentarse como calidad.
 
+Tras el ADR 0007 la cobertura bajó unos cuatro puntos —de 93.6 a 89.3 % en el Método 1, y a
+87 % de noche—, como es esperable al estrechar la banda. No cambia la conclusión: sigue
+dominada por el criterio de validación y no por la escena.
+
 ---
 
 ## 5. Eje 3 — Despliegue: CPU contra CUDA
 
-Medido dentro del contenedor, con el comando de referencia del enunciado.
+Medido dentro del contenedor, con el comando de referencia del enunciado, sobre la imagen
+construida antes del ADR 0007. Los tiempos por etapa de la tabla siguiente sí son
+posteriores a ese cambio, medidos en el host.
 
 | Resolución | Sin `--gpus` (CPU) | Con `--gpus all` | Ganancia |
 |---|---|---|---|
@@ -306,15 +350,15 @@ por qué.** Sobre `video_02` con GPU:
 
 | Etapa | ms/frame |
 |---|---|
-| pretil (NumPy/OpenCV, CPU) | 43.8 |
-| detección (CUDA) | 21.0 |
-| corte de toma | 1.6 |
-| luminancia | 1.4 |
-| renderizado del OSD | 1.1 |
-| proximidad y altura | < 0.1 |
+| pretil (NumPy/OpenCV, CPU) | 41.8 |
+| detección (CUDA) | 16.4 |
+| luminancia y horizonte | 6.2 |
+| renderizado del OSD | 3.8 |
+| corte de toma | 1.4 |
+| altura, proximidad y tracking | < 0.5 |
 
 La GPU acelera únicamente la detección, que ya no es la etapa dominante. La
-segmentación del pretil cuesta el doble y corre en CPU, de modo que acota la ganancia
+segmentación del pretil cuesta 2.5 veces lo que la detección y corre en CPU, de modo que acota la ganancia
 total. Es la ley de Amdahl, y tiene dos consecuencias operativas:
 
 1. **El modo CPU es utilizable** —8 fps sobre clips de diez segundos—, lo que respalda
@@ -345,15 +389,21 @@ La altura medida, desglosada por condición lumínica:
 
 | Condición | Altura mediana M1 |
 |---|---|
-| día | 0.38 m |
-| crepúsculo | 0.47 m |
-| noche | 0.63 m |
+| día | 0.33 m |
+| crepúsculo | 0.36 m |
+| noche | 0.42 m |
 
 **Un pretil físico no cambia de altura al atardecer.** Toda esa dispersión es error de
 medición, y como la invariancia tiene que cumplirse por física, la dispersión observada
 es una **cota inferior del error del método** que no requiere ningún dato etiquetado:
 
-> ±26 % en torno a la mediana global de 0.49 m, sólo por el cambio de iluminación.
+> ±12 % en torno a la mediana global de 0.38 m, sólo por el cambio de iluminación.
+
+Antes del ADR 0007 esta misma cota era de **±26 %**, con la noche en 0.63 m. La mayor parte
+de esa dispersión la producía la confusión con el horizonte: medir la cresta sobre la
+frontera del valle alarga la extensión vertical hasta la base e infla la altura. Corregir
+la banda redujo la cota a la mitad, que es la otra forma en que este reporte mide una
+mejora sin necesidad de ground truth.
 
 Es una cota inferior porque un error sistemático común a las tres condiciones —el ancho
 nominal supuesto, por ejemplo— no aparecería en esta dispersión.
@@ -361,8 +411,12 @@ nominal supuesto, por ejemplo— no aparecería en esta dispersión.
 ### 6.2 El sesgo sistemático
 
 La normativa referencia la altura mínima del pretil al radio de rueda del equipo mayor,
-del orden de **1.5–2 m**. La medición da una mediana de **0.49 m**: baja por un factor
-próximo a 3.
+del orden de **1.5–2 m**. La medición da una mediana de **0.38 m**: baja por un factor
+próximo a 4.
+
+El factor era de 3 antes del ADR 0007. La corrección no empeoró la medición: eliminó un
+error que casualmente inflaba las alturas nocturnas, y con ello el subregistro de fondo
+quedó más a la vista.
 
 No se ajustó ningún parámetro para acercarla a la cifra esperada. Las hipótesis, sin
 resolver:
@@ -385,7 +439,7 @@ mediciones de la misma toma**. Por lo tanto:
 
 - **Detectar que el pretil se degrada respecto a su propia línea base es confiable**,
   porque un factor de escala constante se cancela en la comparación.
-- **Afirmar que el pretil mide 0.49 m no lo es.**
+- **Afirmar que el pretil mide 0.38 m no lo es.**
 
 Y ése es además el caso de uso operativo: a un supervisor le importa que la altura esté
 disminuyendo, no el valor absoluto con dos decimales.
@@ -434,9 +488,10 @@ es la precisión del detector, y por tanto un problema de datos.
 En orden de impacto sobre lo que este reporte no pudo medir o resolver.
 
 **1. No hay ground truth del pretil.** Es la limitación central. Sin él no se mide
-exactitud, sólo estabilidad y costo, y la inversión de jitter en las escenas nocturnas
-queda sin resolver. Anotar el perfil de la cresta en unos 30 frames estratificados
-permitiría calcular el error absoluto de posición y decidir el eje de segmentación con
+exactitud, sólo estabilidad y costo. La inversión nocturna del jitter quedó explicada por el
+ADR 0007, pero con un experimento controlado y no con una medición de error: sigue sin
+conocerse cuánto se aparta la cresta del pretil real. Anotar su perfil en unos 30 frames
+estratificados permitiría calcular ese error absoluto y decidir el eje de segmentación con
 exactitud y no sólo con estabilidad.
 
 **2. La clase `bulldozer` está aprendida pero es frágil** (mAP 0.306, recall 0.455). La
@@ -450,7 +505,7 @@ confianza costaría el recall que la clase minoritaria no tiene margen de perder
 correcta es endurecer la persistencia exigida en el tracker y medir el efecto sobre las
 alertas espurias.
 
-**4. El sesgo sistemático de la altura** (factor ~3) tiene tres hipótesis planteadas en
+**4. El sesgo sistemático de la altura** (factor ~4) tiene tres hipótesis planteadas en
 la sección 6.2 y ninguna descartada.
 
 **5. Falta el segmentador neural del pretil.** Con SAM2 promptado por el camino óptimo
@@ -458,8 +513,8 @@ del Método 1 —los métodos apoyándose uno en otro— el eje del benchmark pa
 comparar dos formulaciones clásicas a comparar prior geométrico contra representación
 aprendida, que es el contraste que el enunciado propone.
 
-**6. La segmentación del pretil es el cuello de botella** (43.8 ms/frame en 720p,
-93.6 ms en 1080p). Llevar la búsqueda de camino óptimo a GPU, o ejecutarla a resolución
+**6. La segmentación del pretil es el cuello de botella** (43.2 ms/frame en 720p,
+90.5 ms en 1080p). Llevar la búsqueda de camino óptimo a GPU, o ejecutarla a resolución
 reducida e interpolar, es la única optimización con retorno real.
 
 **7. Exportación a ONNX Runtime** y medición del speedup frente a PyTorch en FP32 y

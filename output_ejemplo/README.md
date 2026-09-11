@@ -51,7 +51,7 @@ ruedas de OpenCV y por tanto el que garantiza que la imagen funcione sin retoque
 una máquina ajena (ver la nota en `bermguard/io/video_writer.py`).
 
 Los archivos de este directorio se recodificaron a **H.264 (CRF 24)** para que quepan
-en el repositorio: 109 MB pasan a 19 MB sin cambio visible. El contenido —cada frame,
+en el repositorio: los cinco videos pasan de 56.9 MB a 15.9 MB sin cambio visible. El contenido —cada frame,
 cada caja, cada curva— es el que produjo el pipeline. Al ejecutar el contenedor se
 obtienen los mismos artefactos en `mp4v`, más pesados.
 
@@ -66,11 +66,12 @@ obtienen los mismos artefactos en `mp4v`, más pesados.
    Conviene mirarlo sabiendo qué se degrada aquí y no en los otros tres. En el frame
    130, por ejemplo, el CAEX y el bulldozer se detectan como **entidades separadas** y
    ambos en nivel de precaución —que es el comportamiento que el modelo base no podía
-   producir—, pero la caja del camión se extiende bastante más allá de la máquina, y la
-   curva del pretil se engancha a la nube de polvo en el tercio derecho del frame.
-   Ambos defectos son los que el `reporte_benchmark.md` cuantifica: precisión 0.297 en
-   el detector, y una segmentación que sigue estructuras de gradiente fuerte sin poder
-   distinguir terreno de polvo.
+   producir—, pero la caja del camión se extiende bastante más allá de la máquina, y esa
+   caja sobredimensionada arrastra la región de búsqueda del pretil hacia el primer plano:
+   la curva se asienta sobre las huellas de neumático en lugar de sobre el banco que está
+   detrás del bulldozer. Es la interacción de dos limitaciones que el
+   `reporte_benchmark.md` cuantifica —precisión 0.297 en el detector y dominancia del
+   gradiente del primer plano—, y el ADR 0007 la describe.
 2. **`video_01/method_1/berm_height.png`** — la curva de altura con su banda de
    incertidumbre y los huecos declarados en los dos cortes de escena que tiene ese clip.
 3. **`video_02/method_1` contra `video_02/method_2`** — el contraste entre las dos

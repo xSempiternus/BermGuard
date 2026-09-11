@@ -49,6 +49,7 @@ from scipy.ndimage import maximum_filter1d
 from scipy.signal import savgol_filter
 
 from bermguard.core.types import BermPixels, Detection, FloatArray, ImageBGR
+from bermguard.vision.berm.band import search_band
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ class ClassicalBermSegmenter:
         sky_variance_threshold: float = 6.0,
         band_margin_frac: float = 0.04,
         box_dilation_px: int = 12,
+        vehicle_height_multiple: float = 1.0,
     ) -> None:
         """
         Args:
@@ -120,6 +122,7 @@ class ClassicalBermSegmenter:
         self._sky_threshold = sky_variance_threshold
         self._band_margin = band_margin_frac
         self._box_dilation = box_dilation_px
+        self._vehicle_height_multiple = vehicle_height_multiple
 
         self._crest_previa: FloatArray | None = None
 
@@ -216,30 +219,18 @@ class ClassicalBermSegmenter:
     def _banda_de_busqueda(
         self, realzado: np.ndarray, detections: Sequence[Detection]
     ) -> tuple[int, int]:
-        """Acota verticalmente la búsqueda entre el horizonte y la rasante."""
-        alto = realzado.shape[0]
+        """Acota verticalmente la búsqueda. Ver :func:`band.search_band`.
 
-        # Limite superior: primera fila desde arriba con textura. El cielo tiene
-        # varianza por fila muy baja y es el borde horizontal mas nitido de toda la
-        # escena, asi que hay que excluirlo antes de buscar.
-        varianza = realzado.std(axis=1)
-        con_textura = np.flatnonzero(varianza > self._sky_threshold)
-        y_min = int(con_textura[0]) if con_textura.size else 0
-
-        # Limite inferior: el punto de contacto mas bajo de la maquinaria, que es
-        # el de la maquina mas cercana. El pretil esta siempre por encima de el.
-        # Es una cota deliberadamente conservadora: no excluye pretil real cuando
-        # la unica maquina visible esta lejos.
-        if detections:
-            rasante = max(d.bbox.ground_point[1] for d in detections)
-            y_max = int(min(alto, rasante + alto * self._band_margin))
-        else:
-            # Sin referencia se recorta el ultimo 20% del frame, donde la medicion
-            # mostro que domina la textura del primer plano. Es grosero, y por eso
-            # la confianza se penaliza cuando se recurre a esto.
-            y_max = int(alto * 0.80)
-
-        return y_min, max(y_min, y_max)
+        La lógica vive en un módulo compartido para que ambos métodos del
+        benchmark busquen exactamente en la misma región.
+        """
+        return search_band(
+            realzado,
+            detections,
+            sky_variance_threshold=self._sky_threshold,
+            band_margin_frac=self._band_margin,
+            vehicle_height_multiple=self._vehicle_height_multiple,
+        )
 
     def _camino_de_cresta(self, banda: np.ndarray) -> np.ndarray:
         """Camino de máxima respuesta acumulada, con salto vertical acotado.
