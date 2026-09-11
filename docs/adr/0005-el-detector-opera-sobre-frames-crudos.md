@@ -25,8 +25,7 @@ Razones:
 - **El aumento de datos cubre lo mismo.** El entrenamiento varía el brillo y la saturación
   más de lo normal (`hsv_v=0.6`, `hsv_s=0.5`), según el rango medido del material. Así el
   modelo aprende a tolerar los cambios de luz en vez de depender de un preprocesado.
-- **Atar el detector al preprocesado lo hace frágil.** Si se entrena sobre una
-  configuración de CLAHE, cambiar un parámetro obliga a reentrenar. El pretil sí necesita
+- **Atar el detector al preprocesado lo hace frágil.**  El pretil sí necesita
   el realce, porque es un método de gradientes y sin contraste no tiene señal, pero esa
   dependencia no tiene por qué pasar al detector.
 

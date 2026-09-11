@@ -19,7 +19,7 @@ Ejecutado tal cual, el contenedor no ve la GPU. Como la evaluación es automáti
 videos ocultos, no sé si se usará ese comando, si se le agregará `--gpus all` ni qué
 hardware habrá.
 
-Los riesgos no son simétricos: `--gpus all` hace fallar el arranque si el host no tiene el
+`--gpus all` hace fallar el arranque si el host no tiene el
 runtime de NVIDIA, mientras que una imagen con base CUDA corre sin problemas en una máquina
 sin GPU (`torch.cuda.is_available()` simplemente devuelve `False`).
 
@@ -40,16 +40,13 @@ parámetro.
 
 ## Alternativas descartadas
 
-- **ROCm.** No tengo hardware AMD para probarlo, y ofrecer algo que nunca probé es peor que
-  no ofrecerlo.
+- **ROCm.** No tengo hardware AMD para probarlo.
 - **OpenVINO.** Sería la mejor opción si el objetivo fuera CPU. Lo descarté porque suma otro
   runtime y otro formato de modelo que no conozco, con cinco días de desarrollo.
 - **Solo CUDA, sin respaldo.** Si el evaluador usa el comando literal, un contenedor que
   exige GPU no genera nada. El respaldo son unas pocas líneas.
 - **Un perfil liviano para CPU** (modelo más chico, menor resolución). No hace falta: los
-  clips son de unos 250 frames y la CPU los procesa en un tiempo razonable. Un segundo
-  perfil haría que lo medido y lo entregado fueran cosas distintas.
-
+  clips son cortos y la CPU los procesa en un tiempo razonable segun lo medido.
 ## Consecuencias
 
 - La imagen pesa 15.7 GB, casi todo por la base CUDA. El tamaño está en el README.
@@ -58,6 +55,6 @@ parámetro.
 - No aprovecha aceleradores que no sean NVIDIA. Es una limitación asumida.
 - ONNX Runtime queda como trabajo futuro para el benchmark, no como camino principal.
 
-El enunciado pide, ante ambigüedades, *"asumir el criterio de ingeniería más sólido, seguro
+El enunciado pide:  *"asumir el criterio de ingeniería más sólido, seguro
 y justificado, documentando las decisiones en el README.md"*. Este ADR y su resumen en el
 README responden a eso.

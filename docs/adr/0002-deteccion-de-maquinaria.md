@@ -49,9 +49,7 @@ Los resultados zero-shot quedan como la primera columna del benchmark de detecci
 
 - El proyecto suma una etapa de entrenamiento y necesita una validación honesta, separada
   por video (ADR 0004).
-- El modelo queda especializado en este dominio y va a funcionar peor fuera de él. Lo acepto:
-  en seguridad industrial importa más saber cómo falla que ser general.
+- El modelo queda especializado en este dominio y va a funcionar peor fuera de él. Bajo el contexto de seguridad
+  industrial vale mas la pena conocer la falla que el estado general.
 - Cambiar el detector no tocó el orquestador, porque el nuevo implementa el mismo
   `IDetector`.
-- Mientras entrenaba, el resto del pipeline siguió avanzando con el detector COCO, que sí
-  encuentra los CAEX.
