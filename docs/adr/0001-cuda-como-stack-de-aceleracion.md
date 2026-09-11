@@ -5,7 +5,7 @@
 
 ## Contexto
 
-El enunciado se contradice en un punto. Los requisitos piden que el sistema *"funcione
+Los requisitos piden que el sistema *"funcione
 out-of-the-box y use GPU (CUDA o ROCm o OPENVINO…)"*, pero el único comando de referencia
 no incluye `--gpus`:
 
