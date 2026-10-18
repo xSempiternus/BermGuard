@@ -1,0 +1,265 @@
+{
+ "version": 1,
+ "fecha": "2026-10-17",
+ "metodo": "Revisión visual de las 191 etiquetas en formato caja (pre-anotaciones del modelo COCO que no se convirtieron a polígono), recortadas con contexto en hojas de contacto. Las etiquetas en polígono fueron corregidas a mano al anotar y no se revisaron.",
+ "cambios": [
+  {
+   "archivo": "train/video_01_f00282_jpg.rf.c63f309e9dad4b6310d6415d04d738d5.txt",
+   "linea": 0,
+   "original": "0 0.475 0.6291666666666667 0.19479166666666667 0.1962962962962963",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00066_jpg.rf.5bbe0ed9bc1c28eb38d4c3f426651696.txt",
+   "linea": 0,
+   "original": "0 0.64453125 0.5875 0.18984375 0.17083333333333334",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00072_jpg.rf.1ff1836f7052b0f825bf1a59fe790e55.txt",
+   "linea": 0,
+   "original": "0 0.630078125 0.5875 0.18984375 0.17083333333333334",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00078_jpg.rf.e6b569f98d4d8550070be90ba9945d0a.txt",
+   "linea": 0,
+   "original": "0 0.61328125 0.5881944444444445 0.19296875 0.17222222222222222",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00084_jpg.rf.401b8bff0258764666cffcd9cf96d7b7.txt",
+   "linea": 0,
+   "original": "0 0.598046875 0.5895833333333333 0.18984375 0.175",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00090_jpg.rf.a1985fac3dba06972bf2c7dcfbd5e623.txt",
+   "linea": 1,
+   "original": "0 0.584375 0.5888888888888889 0.18671875 0.175",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00096_jpg.rf.282435cbc718ab42f5760859f680894c.txt",
+   "linea": 1,
+   "original": "0 0.56875 0.5888888888888889 0.1859375 0.1736111111111111",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00126_jpg.rf.1e626e70a8183106a97183e0187da576.txt",
+   "linea": 1,
+   "original": "0 0.485546875 0.5875 0.18984375 0.16944444444444445",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00132_jpg.rf.fd440e3caa23d172b0fb6db167d370ac.txt",
+   "linea": 0,
+   "original": "0 0.46875 0.5909722222222222 0.19140625 0.17777777777777778",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00138_jpg.rf.84203328741c018ffc88e2fa0ba1082a.txt",
+   "linea": 0,
+   "original": "0 0.450390625 0.5895833333333333 0.19765625 0.1736111111111111",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00144_jpg.rf.6fabbc50173dff6e311f3f9d5a6e76e2.txt",
+   "linea": 0,
+   "original": "0 0.437109375 0.5875 0.1921875 0.16666666666666666",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_02_f00150_jpg.rf.7f57abebc6e1bc1d69b0ac7ea7843ddc.txt",
+   "linea": 0,
+   "original": "0 0.42109375 0.5972222222222222 0.196875 0.18472222222222223",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00054_jpg.rf.d5932f0a7849f9c097816881584efc22.txt",
+   "linea": 1,
+   "original": "0 0.7234375 0.5888888888888889 0.18203125 0.1763888888888889",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00060_jpg.rf.9665f09c44af36b8eff72b25205a093c.txt",
+   "linea": 0,
+   "original": "0 0.71796875 0.5881944444444445 0.19140625 0.175",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00066_jpg.rf.8b8fc91dee49e93cb125dd6362c08c24.txt",
+   "linea": 0,
+   "original": "0 0.704296875 0.5875 0.19921875 0.1763888888888889",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00072_jpg.rf.31ed85acf6f174d7453ef930fb7bfbd4.txt",
+   "linea": 0,
+   "original": "0 0.69609375 0.5888888888888889 0.1953125 0.175",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00084_jpg.rf.6073b85d291ca63d4634f4991f2b20b3.txt",
+   "linea": 1,
+   "original": "0 0.669921875 0.5868055555555556 0.190625 0.16666666666666666",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00090_jpg.rf.18178efd161100c30e73c82e9db17d94.txt",
+   "linea": 1,
+   "original": "0 0.6546875 0.5881944444444445 0.18984375 0.1736111111111111",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00096_jpg.rf.e3660e186b7be3c66f72ca013b20030f.txt",
+   "linea": 1,
+   "original": "0 0.63984375 0.5861111111111111 0.190625 0.16944444444444445",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00120_jpg.rf.e4a72e1d9a50349b2dc732db544390a4.txt",
+   "linea": 1,
+   "original": "0 0.47890625 0.5659722222222222 0.1546875 0.1361111111111111",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00144_jpg.rf.752a0dec5c4ee960763d10fafa06a7b1.txt",
+   "linea": 0,
+   "original": "0 0.385546875 0.56875 0.17421875 0.1361111111111111",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00222_jpg.rf.de65a767b61a0c5cf4e6be98ccb80b51.txt",
+   "linea": 1,
+   "original": "0 0.477734375 0.5645833333333333 0.16015625 0.12777777777777777",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00228_jpg.rf.17b1121c5b6a78ba00b776a5ffa75288.txt",
+   "linea": 1,
+   "original": "0 0.448828125 0.5645833333333333 0.16484375 0.12638888888888888",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "train/video_03_f00234_jpg.rf.c3b9443366779a531356c21f2b524c99.txt",
+   "linea": 1,
+   "original": "0 0.423046875 0.5631944444444444 0.1640625 0.12361111111111112",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "val/video_04_f00078_jpg.rf.0bc107ebf31f51600521f9260f1b879f.txt",
+   "linea": 0,
+   "original": "0 0.41796875 0.5631944444444444 0.13046875 0.11666666666666667",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "val/video_04_f00084_jpg.rf.614d1383b2d232996b0a61c5f4efed9b.txt",
+   "linea": 0,
+   "original": "0 0.39609375 0.5625 0.1328125 0.11805555555555555",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "val/video_04_f00090_jpg.rf.3755a5a51c735854f6d51db32663016d.txt",
+   "linea": 0,
+   "original": "0 0.381640625 0.5645833333333333 0.134375 0.11944444444444445",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "val/video_04_f00228_jpg.rf.acd4041668f9d7782cc3e267911ec7f9.txt",
+   "linea": 0,
+   "original": "0 0.573046875 0.5895833333333333 0.14765625 0.12916666666666668",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  },
+  {
+   "archivo": "val/video_04_f00234_jpg.rf.5efbee0f619ae349c5e94c5a377ba6a9.txt",
+   "linea": 0,
+   "original": "0 0.5609375 0.5868055555555556 0.146875 0.12638888888888888",
+   "de": 0,
+   "a": 1,
+   "motivo": "bulldozer etiquetado como caex: hoja, orugas y ripper visibles"
+  }
+ ],
+ "pendientes": [
+  {
+   "archivo": "train/video_03_f00096_jpg.rf.e3660e186b7be3c66f72ca013b20030f.txt",
+   "linea": 0,
+   "original": "0 0.36640625 0.6423611111111112 0.72734375 0.35833333333333334",
+   "motivo": "caja fusionada: abarca un CAEX y un bulldozer lejano; hay que partirla a mano"
+  },
+  {
+   "archivo": "train/video_02_f00228_jpg.rf.cf371725bc5b02fc466bfd7d4b9d09d8.txt",
+   "linea": 0,
+   "original": "0 0.526953125 0.6055555555555555 0.21171875 0.16805555555555557",
+   "motivo": "artefacto del video generado: hoja de bulldozer fundida con un CAEX; se deja como caex"
+  },
+  {
+   "archivo": "train/video_02_f00234_jpg.rf.180a5aad9f5f62246ab692744be7ba83.txt",
+   "linea": 0,
+   "original": "0 0.50546875 0.6069444444444444 0.2203125 0.17083333333333334",
+   "motivo": "artefacto del video generado: hoja de bulldozer fundida con un CAEX; se deja como caex"
+  },
+  {
+   "archivo": "train/video_01_f00186_jpg.rf.1800db99ae262c1e391775f01561b94e.txt",
+   "linea": 1,
+   "original": "0 0.4747395833333333 0.5064814814814815 0.0734375 0.06481481481481481",
+   "motivo": "máquina oscura con polvo, tipo indistinguible; se deja como caex"
+  }
+ ]
+}
