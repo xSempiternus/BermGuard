@@ -1,0 +1,214 @@
+{
+  "antes": {
+    "video_01/method_1": {
+      "jitter_mediana_px": 40.101,
+      "jitter_columna_px": 5.52,
+      "cobertura": 0.6529749586092717,
+      "sin_pretil": 0.0,
+      "alertas": 39,
+      "altura_mediana_por_luz": {
+        "day": 0.418,
+        "dusk": 0.422,
+        "night": 0.61
+      },
+      "frames_con_altura": 296
+    },
+    "video_01/method_2": {
+      "jitter_mediana_px": 49.351,
+      "jitter_columna_px": 8.802,
+      "cobertura": 0.6789200469094919,
+      "sin_pretil": 0.0,
+      "alertas": 39,
+      "altura_mediana_por_luz": {
+        "day": 0.415,
+        "dusk": 0.446,
+        "night": 0.522
+      },
+      "frames_con_altura": 296
+    },
+    "video_02/method_1": {
+      "jitter_mediana_px": 15.085,
+      "jitter_columna_px": 0.494,
+      "cobertura": 0.4978466386554622,
+      "sin_pretil": 0.008333333333333333,
+      "alertas": 12,
+      "altura_mediana_por_luz": {
+        "day": 0.281,
+        "dusk": 0.325,
+        "night": 0.406
+      },
+      "frames_con_altura": 238
+    },
+    "video_02/method_2": {
+      "jitter_mediana_px": 14.25,
+      "jitter_columna_px": 0.675,
+      "cobertura": 0.4997603728991599,
+      "sin_pretil": 0.008333333333333333,
+      "alertas": 12,
+      "altura_mediana_por_luz": {
+        "day": 0.276,
+        "dusk": 0.335,
+        "night": 0.393
+      },
+      "frames_con_altura": 238
+    },
+    "video_03/method_1": {
+      "jitter_mediana_px": 13.256,
+      "jitter_columna_px": 0.885,
+      "cobertura": 0.4457779947916666,
+      "sin_pretil": 0.0,
+      "alertas": 16,
+      "altura_mediana_por_luz": {
+        "day": 0.31,
+        "dusk": 0.306,
+        "night": 0.452
+      },
+      "frames_con_altura": 240
+    },
+    "video_03/method_2": {
+      "jitter_mediana_px": 12.827,
+      "jitter_columna_px": 1.73,
+      "cobertura": 0.4531087239583334,
+      "sin_pretil": 0.0,
+      "alertas": 16,
+      "altura_mediana_por_luz": {
+        "day": 0.312,
+        "dusk": 0.304,
+        "night": 0.408
+      },
+      "frames_con_altura": 240
+    },
+    "video_04/method_1": {
+      "jitter_mediana_px": 16.345,
+      "jitter_columna_px": 2.102,
+      "cobertura": 0.5427897135416665,
+      "sin_pretil": 0.0,
+      "alertas": 13,
+      "altura_mediana_por_luz": {
+        "day": 0.386,
+        "dusk": 0.328,
+        "night": 0.409
+      },
+      "frames_con_altura": 240
+    },
+    "video_04/method_2": {
+      "jitter_mediana_px": 19.028,
+      "jitter_columna_px": 2.387,
+      "cobertura": 0.5455078125,
+      "sin_pretil": 0.0,
+      "alertas": 13,
+      "altura_mediana_por_luz": {
+        "day": 0.369,
+        "dusk": 0.326,
+        "night": 0.386
+      },
+      "frames_con_altura": 240
+    }
+  },
+  "despues": {
+    "video_01/method_1": {
+      "jitter_mediana_px": 39.002,
+      "jitter_columna_px": 5.962,
+      "cobertura": 0.6852338576158945,
+      "sin_pretil": 0.0,
+      "alertas": 39,
+      "altura_mediana_por_luz": {
+        "day": 0.43,
+        "dusk": 0.446,
+        "night": 0.622
+      },
+      "frames_con_altura": 296
+    },
+    "video_01/method_2": {
+      "jitter_mediana_px": 49.361,
+      "jitter_columna_px": 7.149,
+      "cobertura": 0.6627862858719645,
+      "sin_pretil": 0.0,
+      "alertas": 39,
+      "altura_mediana_por_luz": {
+        "day": 0.436,
+        "dusk": 0.46,
+        "night": 0.558
+      },
+      "frames_con_altura": 296
+    },
+    "video_02/method_1": {
+      "jitter_mediana_px": 14.415,
+      "jitter_columna_px": 0.63,
+      "cobertura": 0.5162421218487397,
+      "sin_pretil": 0.008333333333333333,
+      "alertas": 12,
+      "altura_mediana_por_luz": {
+        "day": 0.298,
+        "dusk": 0.347,
+        "night": 0.416
+      },
+      "frames_con_altura": 238
+    },
+    "video_02/method_2": {
+      "jitter_mediana_px": 14.318,
+      "jitter_columna_px": 0.638,
+      "cobertura": 0.5060990021008405,
+      "sin_pretil": 0.008333333333333333,
+      "alertas": 12,
+      "altura_mediana_por_luz": {
+        "day": 0.298,
+        "dusk": 0.35,
+        "night": 0.401
+      },
+      "frames_con_altura": 238
+    },
+    "video_03/method_1": {
+      "jitter_mediana_px": 13.193,
+      "jitter_columna_px": 0.983,
+      "cobertura": 0.4923437499999998,
+      "sin_pretil": 0.0,
+      "alertas": 16,
+      "altura_mediana_por_luz": {
+        "day": 0.324,
+        "dusk": 0.322,
+        "night": 0.449
+      },
+      "frames_con_altura": 240
+    },
+    "video_03/method_2": {
+      "jitter_mediana_px": 16.102,
+      "jitter_columna_px": 1.553,
+      "cobertura": 0.4802473958333335,
+      "sin_pretil": 0.0,
+      "alertas": 16,
+      "altura_mediana_por_luz": {
+        "day": 0.327,
+        "dusk": 0.324,
+        "night": 0.435
+      },
+      "frames_con_altura": 240
+    },
+    "video_04/method_1": {
+      "jitter_mediana_px": 20.431,
+      "jitter_columna_px": 2.236,
+      "cobertura": 0.5571875,
+      "sin_pretil": 0.0,
+      "alertas": 13,
+      "altura_mediana_por_luz": {
+        "day": 0.4,
+        "dusk": 0.346,
+        "night": 0.431
+      },
+      "frames_con_altura": 240
+    },
+    "video_04/method_2": {
+      "jitter_mediana_px": 23.442,
+      "jitter_columna_px": 2.978,
+      "cobertura": 0.5422786458333333,
+      "sin_pretil": 0.0,
+      "alertas": 13,
+      "altura_mediana_por_luz": {
+        "day": 0.383,
+        "dusk": 0.348,
+        "night": 0.404
+      },
+      "frames_con_altura": 240
+    }
+  }
+}

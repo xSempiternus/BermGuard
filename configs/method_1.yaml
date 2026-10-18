@@ -41,6 +41,13 @@ proximity:
   frames_to_escalate: 3
   frames_to_deescalate: 10
 
+berm:
+  # Media resolucion: el pretil se busca sobre un gradiente suavizado con sigma 6,
+  # asi que la resolucion completa no aporta. 3.5x menos tiempo en la etapa (110 -> 31
+  # ms a 1080p) con un jitter por columna entre 7 y 28 % mayor, bajo un pixel a 720p.
+  # Ver docs/adr/0010.
+  analysis_scale: 0.5
+
 output:
   fourcc: mp4v
   draw_hud: true

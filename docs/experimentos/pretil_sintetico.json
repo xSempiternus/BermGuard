@@ -1,0 +1,300 @@
+{
+  "semillas": 20,
+  "metrica": "fraccion de columnas a <=5 px",
+  "filas": [
+    {
+      "contraste": 8.0,
+      "huellas": 0,
+      "camino_optimo": {
+        "within_5": 0.8468,
+        "within_5_se": 0.0098,
+        "mae_px": 1.12
+      },
+      "argmax": {
+        "within_5": 0.8411,
+        "within_5_se": 0.0098,
+        "mae_px": 1.15
+      }
+    },
+    {
+      "contraste": 8.0,
+      "huellas": 2,
+      "camino_optimo": {
+        "within_5": 0.5616,
+        "within_5_se": 0.0399,
+        "mae_px": 21.85
+      },
+      "argmax": {
+        "within_5": 0.5232,
+        "within_5_se": 0.0205,
+        "mae_px": 24.17
+      }
+    },
+    {
+      "contraste": 8.0,
+      "huellas": 4,
+      "camino_optimo": {
+        "within_5": 0.3292,
+        "within_5_se": 0.0402,
+        "mae_px": 38.73
+      },
+      "argmax": {
+        "within_5": 0.3417,
+        "within_5_se": 0.0252,
+        "mae_px": 36.82
+      }
+    },
+    {
+      "contraste": 8.0,
+      "huellas": 6,
+      "camino_optimo": {
+        "within_5": 0.1652,
+        "within_5_se": 0.0337,
+        "mae_px": 54.29
+      },
+      "argmax": {
+        "within_5": 0.215,
+        "within_5_se": 0.0295,
+        "mae_px": 48.62
+      }
+    },
+    {
+      "contraste": 8.0,
+      "huellas": 8,
+      "camino_optimo": {
+        "within_5": 0.044,
+        "within_5_se": 0.0153,
+        "mae_px": 64.81
+      },
+      "argmax": {
+        "within_5": 0.0776,
+        "within_5_se": 0.0216,
+        "mae_px": 60.69
+      }
+    },
+    {
+      "contraste": 8.0,
+      "huellas": 10,
+      "camino_optimo": {
+        "within_5": 0.0066,
+        "within_5_se": 0.0064,
+        "mae_px": 69.65
+      },
+      "argmax": {
+        "within_5": 0.0081,
+        "within_5_se": 0.008,
+        "mae_px": 69.83
+      }
+    },
+    {
+      "contraste": 8.0,
+      "huellas": 12,
+      "camino_optimo": {
+        "within_5": 0.0,
+        "within_5_se": 0.0,
+        "mae_px": 68.34
+      },
+      "argmax": {
+        "within_5": 0.0,
+        "within_5_se": 0.0,
+        "mae_px": 68.36
+      }
+    },
+    {
+      "contraste": 12.0,
+      "huellas": 0,
+      "camino_optimo": {
+        "within_5": 1.0,
+        "within_5_se": 0.0,
+        "mae_px": 0.92
+      },
+      "argmax": {
+        "within_5": 0.9951,
+        "within_5_se": 0.0008,
+        "mae_px": 0.95
+      }
+    },
+    {
+      "contraste": 12.0,
+      "huellas": 2,
+      "camino_optimo": {
+        "within_5": 0.8755,
+        "within_5_se": 0.0365,
+        "mae_px": 7.52
+      },
+      "argmax": {
+        "within_5": 0.7888,
+        "within_5_se": 0.0322,
+        "mae_px": 13.03
+      }
+    },
+    {
+      "contraste": 12.0,
+      "huellas": 4,
+      "camino_optimo": {
+        "within_5": 0.7054,
+        "within_5_se": 0.0447,
+        "mae_px": 16.13
+      },
+      "argmax": {
+        "within_5": 0.5943,
+        "within_5_se": 0.0289,
+        "mae_px": 21.94
+      }
+    },
+    {
+      "contraste": 12.0,
+      "huellas": 6,
+      "camino_optimo": {
+        "within_5": 0.4747,
+        "within_5_se": 0.052,
+        "mae_px": 32.83
+      },
+      "argmax": {
+        "within_5": 0.4402,
+        "within_5_se": 0.0341,
+        "mae_px": 32.65
+      }
+    },
+    {
+      "contraste": 12.0,
+      "huellas": 8,
+      "camino_optimo": {
+        "within_5": 0.3151,
+        "within_5_se": 0.0417,
+        "mae_px": 43.67
+      },
+      "argmax": {
+        "within_5": 0.3116,
+        "within_5_se": 0.0276,
+        "mae_px": 41.64
+      }
+    },
+    {
+      "contraste": 12.0,
+      "huellas": 10,
+      "camino_optimo": {
+        "within_5": 0.217,
+        "within_5_se": 0.033,
+        "mae_px": 51.72
+      },
+      "argmax": {
+        "within_5": 0.2411,
+        "within_5_se": 0.0239,
+        "mae_px": 48.37
+      }
+    },
+    {
+      "contraste": 12.0,
+      "huellas": 12,
+      "camino_optimo": {
+        "within_5": 0.1652,
+        "within_5_se": 0.0272,
+        "mae_px": 53.8
+      },
+      "argmax": {
+        "within_5": 0.1975,
+        "within_5_se": 0.021,
+        "mae_px": 50.39
+      }
+    },
+    {
+      "contraste": 18.0,
+      "huellas": 0,
+      "camino_optimo": {
+        "within_5": 1.0,
+        "within_5_se": 0.0,
+        "mae_px": 0.85
+      },
+      "argmax": {
+        "within_5": 0.9991,
+        "within_5_se": 0.0003,
+        "mae_px": 0.86
+      }
+    },
+    {
+      "contraste": 18.0,
+      "huellas": 2,
+      "camino_optimo": {
+        "within_5": 1.0,
+        "within_5_se": 0.0,
+        "mae_px": 0.85
+      },
+      "argmax": {
+        "within_5": 0.954,
+        "within_5_se": 0.0176,
+        "mae_px": 2.57
+      }
+    },
+    {
+      "contraste": 18.0,
+      "huellas": 4,
+      "camino_optimo": {
+        "within_5": 0.9201,
+        "within_5_se": 0.0283,
+        "mae_px": 3.99
+      },
+      "argmax": {
+        "within_5": 0.8505,
+        "within_5_se": 0.0238,
+        "mae_px": 6.61
+      }
+    },
+    {
+      "contraste": 18.0,
+      "huellas": 6,
+      "camino_optimo": {
+        "within_5": 0.8978,
+        "within_5_se": 0.0342,
+        "mae_px": 5.49
+      },
+      "argmax": {
+        "within_5": 0.747,
+        "within_5_se": 0.0324,
+        "mae_px": 12.08
+      }
+    },
+    {
+      "contraste": 18.0,
+      "huellas": 8,
+      "camino_optimo": {
+        "within_5": 0.7833,
+        "within_5_se": 0.0549,
+        "mae_px": 13.87
+      },
+      "argmax": {
+        "within_5": 0.6898,
+        "within_5_se": 0.0366,
+        "mae_px": 16.78
+      }
+    },
+    {
+      "contraste": 18.0,
+      "huellas": 10,
+      "camino_optimo": {
+        "within_5": 0.6662,
+        "within_5_se": 0.0694,
+        "mae_px": 21.24
+      },
+      "argmax": {
+        "within_5": 0.563,
+        "within_5_se": 0.036,
+        "mae_px": 24.94
+      }
+    },
+    {
+      "contraste": 18.0,
+      "huellas": 12,
+      "camino_optimo": {
+        "within_5": 0.6001,
+        "within_5_se": 0.0682,
+        "mae_px": 24.24
+      },
+      "argmax": {
+        "within_5": 0.4888,
+        "within_5_se": 0.0364,
+        "mae_px": 28.95
+      }
+    }
+  ]
+}
