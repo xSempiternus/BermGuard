@@ -65,6 +65,7 @@ class YoloDetector:
         image_size: int = 640,
         half_precision: bool = True,
         class_map: Mapping[int, VehicleClass] | None = None,
+        class_confidence: Mapping[str, float] | None = None,
     ) -> None:
         """
         Args:
@@ -88,12 +89,20 @@ class YoloDetector:
                 posee filtra todas las detecciones y el pipeline produce artefactos
                 vacíos sin lanzar ningún error, así que el constructor lo valida.
 
+            class_confidence: Umbral propio por clase, por nombre de
+                :class:`VehicleClass`. El modelo se consulta con el menor de todos los
+                umbrales y cada detección se filtra después con el de su clase.
+
         Raises:
             ModelLoadError: Si el checkpoint no se puede cargar, o si el mapeo de
                 clases no corresponde a las que el modelo declara.
         """
         self._class_map = dict(class_map or DOMAIN_CLASS_MAP)
         self._confidence = confidence
+        self._class_confidence = {
+            VehicleClass(nombre): valor for nombre, valor in (class_confidence or {}).items()
+        }
+        self._consulta = min([confidence, *self._class_confidence.values()])
         self._iou = iou
         self._image_size = image_size
         self._device = device
@@ -155,7 +164,7 @@ class YoloDetector:
         """
         results = self._model.predict(
             source=frame,
-            conf=self._confidence,
+            conf=self._consulta,
             iou=self._iou,
             imgsz=self._image_size,
             device=self._device,
@@ -174,7 +183,7 @@ class YoloDetector:
         confidences = boxes.conf.cpu().numpy()
         class_ids = boxes.cls.cpu().numpy().astype(int)
 
-        return [
+        detecciones = [
             Detection(
                 track_id=-1,
                 vehicle_class=self._class_map.get(int(cls), VehicleClass.UNKNOWN),
@@ -182,4 +191,9 @@ class YoloDetector:
                 confidence=float(conf),
             )
             for (x1, y1, x2, y2), conf, cls in zip(xyxy, confidences, class_ids, strict=True)
+        ]
+        return [
+            d
+            for d in detecciones
+            if d.confidence >= self._class_confidence.get(d.vehicle_class, self._confidence)
         ]

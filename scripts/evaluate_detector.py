@@ -94,11 +94,14 @@ def predecir(args: argparse.Namespace) -> list[ImageEval]:
     return salida
 
 
-def resumir(imagenes: list[ImageEval], conf: float, replicas: int) -> dict[str, object]:
+def resumir(
+    imagenes: list[ImageEval], conf: float, replicas: int, por_clase: dict[str, float]
+) -> dict[str, object]:
     reporte: dict[str, object] = {}
     for cls, nombre in NOMBRES.items():
-        puntual = class_metrics(imagenes, cls, conf)
-        ic = bootstrap_ci(imagenes, cls, conf, replicas=replicas)
+        umbral = por_clase.get(nombre, conf)
+        puntual = class_metrics(imagenes, cls, umbral)
+        ic = bootstrap_ci(imagenes, cls, umbral, replicas=replicas)
         reporte[nombre] = {
             **{k: round(v, 4) for k, v in puntual.items()},
             "ic95": {k: [round(a, 4), round(b, 4)] for k, (a, b) in ic.items()},
@@ -113,6 +116,12 @@ def main() -> None:
     parser.add_argument("--labels", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--conf", type=float, default=0.25, help="Umbral de operación")
+    parser.add_argument(
+        "--class-conf",
+        nargs="*",
+        default=[],
+        help="Umbral por clase, como en configs/: bulldozer=0.05",
+    )
     parser.add_argument("--iou", type=float, default=0.45, help="NMS, igual que en configs/")
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--block", type=int, default=5)
@@ -120,14 +129,16 @@ def main() -> None:
     parser.add_argument("--device", default="cuda")
     args = parser.parse_args()
 
+    por_clase = {k: float(v) for k, v in (par.split("=") for par in args.class_conf)}
     imagenes = predecir(args)
     reporte: dict[str, object] = {
         "pesos": str(args.weights),
         "imagenes": len(imagenes),
         "bloques": len({i.group for i in imagenes}),
         "umbral_operacion": args.conf,
+        "umbral_por_clase": por_clase,
         "nms_iou": args.iou,
-        "por_clase": resumir(imagenes, args.conf, args.replicas),
+        "por_clase": resumir(imagenes, args.conf, args.replicas, por_clase),
         "barrido": {
             nombre: threshold_sweep(imagenes, cls, np.round(np.arange(0.05, 0.96, 0.05), 2))
             for cls, nombre in NOMBRES.items()
@@ -138,7 +149,7 @@ def main() -> None:
         subconjunto = [i for i in imagenes if i.tags["luz"] == luz]
         reporte["por_luz"][luz] = {  # type: ignore[index]
             "imagenes": len(subconjunto),
-            **resumir(subconjunto, args.conf, max(200, args.replicas // 4)),
+            **resumir(subconjunto, args.conf, max(200, args.replicas // 4), por_clase),
         }
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

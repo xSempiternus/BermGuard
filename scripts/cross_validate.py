@@ -139,6 +139,19 @@ def main() -> None:
     parser.add_argument("--folds", nargs="+", default=list(VIDEOS))
     parser.add_argument("--epochs", type=int, default=80)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--batch",
+        type=int,
+        default=4,
+        help="4 y no 8: con el escritorio abierto quedan ~2.6 GB de VRAM y con 8 Windows "
+        "pagina la GPU a RAM (350 s por iteración). Igual para todas las variantes.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="0 en Windows: cada época relanza los workers, que reimportan torch (~45 s).",
+    )
     parser.add_argument("--out", type=Path, default=Path("docs/experimentos/lovo"))
     parser.add_argument("--skip-train", action="store_true", help="Sólo reevaluar")
     args = parser.parse_args()
@@ -164,6 +177,10 @@ def main() -> None:
                         str(args.epochs),
                         "--seed",
                         str(args.seed),
+                        "--batch",
+                        str(args.batch),
+                        "--workers",
+                        str(args.workers),
                         "--project",
                         str(proyecto),
                         "--name",
@@ -171,6 +188,9 @@ def main() -> None:
                     ],
                     check=True,
                 )
+            # Ultralytics 8.4 antepone runs/detect a un proyecto relativo.
+            candidatos = [pesos, Path("runs/detect") / pesos]
+            pesos = next((c for c in candidatos if c.exists()), pesos)
             salida = args.out / f"{variante}_{val}.json"
             subprocess.run(
                 [
