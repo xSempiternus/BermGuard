@@ -17,9 +17,11 @@ from bermguard.analytics.height import GroundPlaneHeightEstimator
 from bermguard.analytics.proximity import ProximityAnalyzer
 from bermguard.core.config import PipelineConfig
 from bermguard.core.exceptions import ConfigError
+from bermguard.core.interfaces import IBermSegmenter
 from bermguard.pipeline.orchestrator import Orchestrator
 from bermguard.vision.berm.argmax_baseline import ArgmaxBermSegmenter
 from bermguard.vision.berm.classical import ClassicalBermSegmenter
+from bermguard.vision.berm.scaled import ScaledBermSegmenter
 from bermguard.vision.detectors.yolo_detector import YoloDetector
 from bermguard.vision.tracking import IouTracker
 
@@ -46,6 +48,7 @@ def build_orchestrator(config: PipelineConfig, device: str) -> Orchestrator:
         iou=config.detector.iou,
         image_size=config.detector.image_size,
         half_precision=config.detector.half_precision,
+        class_confidence=config.detector.class_confidence,
     )
 
     # El tracker es comun a todos los metodos: la identidad persistente no depende
@@ -64,7 +67,18 @@ def build_orchestrator(config: PipelineConfig, device: str) -> Orchestrator:
     # El metodo 1 lo impone durante la busqueda (camino optimo); el metodo 2 despues
     # (argmax por columna mas filtrado). Comparten preprocesado, exclusion de
     # maquinaria y banda de busqueda, asi que la comparacion aisla la formulacion.
-    berm = ClassicalBermSegmenter() if config.method == 1 else ArgmaxBermSegmenter()
+    # Los parametros en pixeles se escalan con la resolucion de analisis: a 0.5 el
+    # desenfoque, el suavizado y el margen de las cajas miden lo mismo en el terreno.
+    # El salto maximo no se escala: es una pendiente (filas por columna) y ambas se
+    # reducen en la misma proporcion.
+    s = config.berm.analysis_scale
+    sigma, ventana, margen = 6.0 * s, max(5, int(31 * s) | 1), max(1, round(12 * s))
+    berm: IBermSegmenter = ScaledBermSegmenter(
+        ClassicalBermSegmenter(blur_sigma=sigma, smooth_window=ventana, box_dilation_px=margen)
+        if config.method == 1
+        else ArgmaxBermSegmenter(blur_sigma=sigma, smooth_window=ventana, box_dilation_px=margen),
+        scale=s,
+    )
 
     proximity = ProximityAnalyzer(
         caution_m=config.proximity.caution_m,

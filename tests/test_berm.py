@@ -14,6 +14,7 @@ from bermguard.core.types import BBox, Detection, VehicleClass
 from bermguard.vision.berm.argmax_baseline import ArgmaxBermSegmenter
 from bermguard.vision.berm.band import search_band
 from bermguard.vision.berm.classical import ClassicalBermSegmenter
+from bermguard.vision.berm.scaled import ScaledBermSegmenter
 
 SEMILLAS = range(5)
 
@@ -116,3 +117,46 @@ class TestBanda:
         gris[:60, :] = 200
         y_min, _ = search_band(gris, [])
         assert y_min == 60
+
+
+class TestMediaResolucion:
+    def escena_720p(self, huellas: int, semilla: int):
+        spec = SceneSpec(
+            height=720,
+            width=1280,
+            crest_row=340,
+            crest_amplitude=24,
+            tracks=huellas,
+            crest_contrast=18,
+        )
+        return make_scene(spec, seed=semilla)
+
+    def test_a_media_resolucion_conserva_la_exactitud(self):
+        completa, media = [], []
+        for semilla in range(4):
+            escena = self.escena_720p(6, semilla)
+            a = ClassicalBermSegmenter().segment(escena.image)
+            b = ScaledBermSegmenter(
+                ClassicalBermSegmenter(blur_sigma=3.0, smooth_window=15, box_dilation_px=6), 0.5
+            ).segment(escena.image)
+            assert a is not None and b is not None
+            completa.append(crest_error_px(a.crest_y_px, escena.crest_y_px)["within_5"])
+            media.append(crest_error_px(b.crest_y_px, escena.crest_y_px)["within_5"])
+        assert np.mean(media) >= np.mean(completa) - 0.03
+
+    def test_devuelve_el_perfil_a_escala_completa(self):
+        escena = self.escena_720p(0, 0)
+        perfil = ScaledBermSegmenter(ClassicalBermSegmenter(), 0.5).segment(
+            escena.image, [caex(500, 300, 700, 600)]
+        )
+        assert perfil is not None
+        assert perfil.crest_y_px.shape == (1280,)
+        # Las columnas tapadas por la caja (escalada a media resolución) siguen ocultas.
+        assert np.isnan(perfil.crest_y_px[560:640]).all()
+
+    def test_escala_uno_no_cambia_nada(self):
+        escena = make_scene(SceneSpec(), seed=0)
+        a = ClassicalBermSegmenter().segment(escena.image)
+        b = ScaledBermSegmenter(ClassicalBermSegmenter(), 1.0).segment(escena.image)
+        assert a is not None and b is not None
+        np.testing.assert_array_equal(a.crest_y_px, b.crest_y_px)

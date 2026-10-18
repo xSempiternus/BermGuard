@@ -37,6 +37,10 @@ class DetectorConfig(_Base):
     iou: float = Field(0.45, ge=0.0, le=1.0)
     image_size: int = Field(640, ge=32, le=4096)
     half_precision: bool = True
+    class_confidence: dict[str, float] = Field(default_factory=dict)
+    """Umbral propio por clase (``{"bulldozer": 0.05}``); el resto usa ``confidence``.
+    Con clases desbalanceadas, la minoritaria sale con confianzas sistemáticamente más
+    bajas y un umbral global la borra (ADR 0009)."""
 
 
 class LightingConfig(_Base):
@@ -96,6 +100,13 @@ class ProximityConfig(_Base):
     Sin esto el color parpadea cuando la distancia oscila en torno al umbral."""
 
 
+class BermConfig(_Base):
+    analysis_scale: float = Field(1.0, gt=0.0, le=1.0)
+    """Resolución a la que se segmenta el pretil, como fracción del frame. Los
+    parámetros en píxeles del segmentador se escalan en la misma proporción, de modo
+    que 0.5 busca la misma estructura física con cuatro veces menos celdas (ADR 0010)."""
+
+
 class OutputConfig(_Base):
     fourcc: str = Field("mp4v", min_length=4, max_length=4)
     draw_hud: bool = True
@@ -113,6 +124,7 @@ class PipelineConfig(_Base):
     lighting: LightingConfig = LightingConfig()
     shots: ShotConfig = ShotConfig()
     proximity: ProximityConfig = ProximityConfig()
+    berm: BermConfig = BermConfig()
     output: OutputConfig = OutputConfig()
 
     def model_post_init(self, _context: Any) -> None:
