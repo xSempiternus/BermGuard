@@ -54,3 +54,32 @@ públicos etiquetan `truck` o `vehicle`, que no es la distinción que necesito.
 - La validación **no puede ser aleatoria**. Frames del mismo video son casi iguales, y una
   partición aleatoria mediría memoria y no generalización. Separé por video y dejé
   `video_04` completo para validación.
+
+## Revisión (2026-10-18): preentrenar con datos públicos, como variante medida
+
+Volví a buscar datasets públicos, ahora para el experimento que quedó abierto: preentrenar
+con datos públicos y afinar con los frames propios. Revisé la vista previa de cada uno:
+
+| Dataset | Clases útiles | Imágenes | Vista | Parecido con este material |
+|---|---|---|---|---|
+| `ccl-kl4nk/dji_65` (Roboflow, CC0) | `dozer`, `tippertruck` | 136 | Dron **oblicuo** sobre una mina a cielo abierto, con polvo | El más cercano en geometría y escena. Pocas imágenes y objetos chicos; tolvas de carretera, no CAEX |
+| `mohamads-workspace-rl4ui/bulldozer-lpoe2` (CC BY 4.0) | `Bull_dozer` | 1.324 | Fotos de catálogo | Aporta la forma del bulldozer, no la escena |
+| `minitruck/mining-truck-v1.4` | `mining-truck` | 430 | Cámara fija a nivel del suelo, CAEX en primer plano | Sólo CAEX y a otra escala |
+| `igensol/mines-vehicles` | `truck` | 422 | CCTV nocturno con polvo en una mina | Las condiciones nocturnas sí; las máquinas no |
+| mineCareerDB (Mendeley, 2024) | `trucks`, equipos | 203 | Dron a ~400 m | Cenital y sin clase bulldozer |
+
+Sigue sin existir un dataset con este encuadre, y la conclusión sobre la fuente principal
+no cambia. Pero el preentrenamiento no necesita el mismo dominio: sirve si le enseña al
+modelo la forma de un bulldozer, que es la clase con 33 instancias propias. La pregunta es
+empírica, así que queda como una tercera variante de la validación cruzada del ADR 0009:
+
+- `scripts/prepare_pretrain.py` junta los exports YOLO de Roboflow y traduce las clases a
+  `caex` y `bulldozer` (`bermguard/training/pretrain.py`). Las clases sin traducción, como
+  `excavator`, se descartan: forzarlas a una de las dos enseñaría una confusión.
+- `scripts/cross_validate.py --variants pretrain` preentrena una sola vez y afina cada fold
+  con la misma partición e hiperparámetros que `base`. Lo único que cambia es el punto de
+  partida, así que la diferencia con `base` mide el preentrenamiento. Como ninguna imagen
+  pública viene de estos videos, no hay fuga entre folds.
+
+La descarga necesita una API key gratuita de Roboflow y queda fuera del repo (`data/externos/`,
+`data/pretrain/`).

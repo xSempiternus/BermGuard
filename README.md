@@ -118,7 +118,7 @@ bermguard/
 ├── analytics/   geometría, altura y proximidad
 ├── pipeline/    orquestador, factory y dibujo del OSD
 ├── benchmark/   evaluación del detector y escenas sintéticas del pretil
-└── training/    copy-paste augmentation
+└── training/    copy-paste augmentation y remapeo de datasets públicos
 ```
 
 Tres ideas ordenan el código:
@@ -282,7 +282,8 @@ evidencia de `docs/`:
 | `train_detector.py` | Entrena el detector |
 | `eval_detector.py` | Métricas por clase según Ultralytics |
 | `evaluate_detector.py` | Métricas en el punto de operación, con intervalos y desglose por luz |
-| `cross_validate.py` | Validación cruzada dejando un video fuera, con o sin copy-paste |
+| `prepare_pretrain.py` | Junta datasets públicos y traduce sus clases para preentrenar |
+| `cross_validate.py` | Validación cruzada dejando un video fuera: base, copy-paste o preentrenado |
 | `benchmark_berm_synthetic.py` | Exactitud del pretil en escenas con la cresta conocida |
 | `compare_runs.py` | Compara dos corridas completas del pipeline |
 | `make_showcase.py` | Genera las figuras de `docs/showcase/` desde los datos |
@@ -295,7 +296,7 @@ evidencia de `docs/`:
 La lista completa, ordenada por objetivo y con el motivo de cada punto, está en la sección 4
 de [`docs/resultados.md`](docs/resultados.md). Lo más importante:
 
-1. **Correr la validación cruzada** con y sin copy-paste, reentrenar con las etiquetas
+1. **Correr la validación cruzada** (base, copy-paste y preentrenado con datos públicos), reentrenar con las etiquetas
    auditadas y elegir el umbral del bulldozer fuera de muestra. Todo está implementado.
 2. **Validar con video real** y el perfil del pretil anotado en unos 30 frames.
 3. **Exportar el detector a ONNX/TensorRT**: con el pretil a media resolución, es la etapa

@@ -90,6 +90,7 @@ evaluador propio mide la ruta de inferencia que usa el pipeline.
 - LOVO cuesta cuatro entrenamientos por variante, unos 15 a 20 minutos cada uno con la GPU
   libre. Con la GPU compartida con el escritorio (4 GB de VRAM), el entrenamiento se desborda
   a memoria compartida y cada época pasa de 18 s a varios minutos, así que hay que correrlo
-  con la máquina libre: `python scripts/cross_validate.py --variants base copypaste --batch 2`.
+  con la máquina libre: `python scripts/cross_validate.py --variants base copypaste pretrain --batch 2`. La variante
+  `pretrain` (ADR 0004, revisión) agrega un preentrenamiento y cuatro folds más.
 - **El efecto del copy-paste y el umbral por clase aún no están medidos con LOVO.** Hasta
   entonces el pipeline sigue con `detector_v1` y un umbral único.

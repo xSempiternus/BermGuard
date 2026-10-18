@@ -29,6 +29,9 @@ data/dataset/images/
 data/dataset/labels/*.cache
 # Folds de la validacion cruzada: se regeneran con scripts/cross_validate.py.
 data/cv/
+# Datasets públicos descargados y su versión remapeada: se regeneran (ADR 0004).
+data/externos/
+data/pretrain/
 *.mp4
 *.avi
 *.mov

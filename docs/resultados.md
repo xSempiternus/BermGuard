@@ -261,9 +261,10 @@ validarlo sobre material real hace falta video real y el perfil anotado en unos 
 
 ### Detección y proximidad
 
-1. **Reentrenar con las etiquetas auditadas y medir el copy-paste con validación cruzada.**
-   Todo está implementado (`scripts/cross_validate.py --variants base copypaste`); falta
-   correrlo con la GPU libre (ADR 0009).
+1. **Reentrenar con las etiquetas auditadas y medir con validación cruzada el copy-paste y el
+   preentrenamiento con datos públicos.** Todo está implementado
+   (`scripts/cross_validate.py --variants base copypaste pretrain`, ADR 0004 y 0009); falta
+   correrlo con la GPU libre.
 2. **Elegir el umbral del bulldozer** con las predicciones fuera de muestra de esa
    validación cruzada, y activarlo en `configs/`.
 3. **Cerrar los 4 casos pendientes de la auditoría** (`data/auditoria_etiquetas.json`).

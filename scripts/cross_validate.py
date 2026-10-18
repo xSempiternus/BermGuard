@@ -1,4 +1,4 @@
-"""Validación cruzada dejando un video fuera (LOVO), con y sin copy-paste.
+"""Validación cruzada dejando un video fuera (LOVO): base, copy-paste y preentrenado.
 
 Con cuatro videos, una sola partición entrena con tres y valida con uno: es una
 muestra de tamaño uno de "cómo rinde el detector en un video nuevo". LOVO entrena
@@ -15,8 +15,14 @@ fold**, un frame aumentado por cada frame de entrenamiento, con uno o dos
 bulldozers recortados de los videos de entrenamiento de ese mismo fold. Un recorte
 del video de validación sería fuga.
 
+La variante ``pretrain`` usa la misma partición que ``base`` y cambia sólo el punto
+de partida: en vez de los pesos COCO, un modelo afinado antes con datasets públicos
+de maquinaria (``scripts/prepare_pretrain.py``, ADR 0004). Ese preentrenamiento se
+hace una sola vez y sirve para los cuatro folds, porque ninguna de esas imágenes
+viene de los videos del proyecto.
+
 Uso:
-    python scripts/cross_validate.py --variants base copypaste
+    python scripts/cross_validate.py --variants base copypaste pretrain
 """
 
 from __future__ import annotations
@@ -131,11 +137,56 @@ def preparar_fold(
     return fold, conteo
 
 
+def resolver_pesos(pesos: Path) -> Path:
+    # Ultralytics 8.4 antepone runs/detect a un proyecto relativo.
+    candidatos = [pesos, Path("runs/detect") / pesos]
+    return next((c for c in candidatos if c.exists()), pesos)
+
+
+def entrenar(
+    python: str,
+    data: Path,
+    proyecto: Path,
+    nombre: str,
+    args: argparse.Namespace,
+    modelo: str,
+    epocas: int,
+) -> None:
+    subprocess.run(
+        [
+            python,
+            "scripts/train_detector.py",
+            "--data",
+            str(data),
+            "--model",
+            modelo,
+            "--epochs",
+            str(epocas),
+            "--seed",
+            str(args.seed),
+            "--batch",
+            str(args.batch),
+            "--workers",
+            str(args.workers),
+            "--project",
+            str(proyecto),
+            "--name",
+            nombre,
+        ],
+        check=True,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, default=Path("data/dataset"))
     parser.add_argument("--work", type=Path, default=Path("data/cv"))
-    parser.add_argument("--variants", nargs="+", default=["base", "copypaste"])
+    parser.add_argument(
+        "--variants",
+        nargs="+",
+        default=["base", "copypaste"],
+        choices=["base", "copypaste", "pretrain"],
+    )
     parser.add_argument("--folds", nargs="+", default=list(VIDEOS))
     parser.add_argument("--epochs", type=int, default=80)
     parser.add_argument("--seed", type=int, default=0)
@@ -152,6 +203,13 @@ def main() -> None:
         default=0,
         help="0 en Windows: relanzar los workers en cada época lleva la época de 22 s a 42 s.",
     )
+    parser.add_argument(
+        "--pretrain-data",
+        type=Path,
+        default=Path("data/pretrain/data.yaml"),
+        help="Salida de prepare_pretrain.py; sólo para la variante pretrain",
+    )
+    parser.add_argument("--pretrain-epochs", type=int, default=50)
     parser.add_argument("--out", type=Path, default=Path("docs/experimentos/lovo"))
     parser.add_argument("--skip-train", action="store_true", help="Sólo reevaluar")
     args = parser.parse_args()
@@ -160,37 +218,34 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     python = sys.executable
 
+    pesos_previos = resolver_pesos(Path("weights/pretrain/externo/weights/best.pt"))
+    if "pretrain" in args.variants and not pesos_previos.exists():
+        if args.skip_train or not args.pretrain_data.exists():
+            raise SystemExit(
+                f"Falta {pesos_previos} y no se puede entrenar: corré antes prepare_pretrain.py"
+            )
+        print(f"[pretrain] preentrenando con {args.pretrain_data}", flush=True)
+        entrenar(
+            python,
+            args.pretrain_data,
+            Path("weights/pretrain"),
+            "externo",
+            args,
+            "yolo11s.pt",
+            args.pretrain_epochs,
+        )
+        pesos_previos = resolver_pesos(pesos_previos)
+
     for variante in args.variants:
+        modelo = str(pesos_previos) if variante == "pretrain" else "yolo11s.pt"
         for val in args.folds:
             proyecto = Path("weights/cv") / variante
             pesos = proyecto / val / "weights" / "best.pt"
             fold, conteo = preparar_fold(por_video, val, variante, args.work, args.seed)
             print(f"[{variante}/{val}] {conteo}", flush=True)
             if not args.skip_train:
-                subprocess.run(
-                    [
-                        python,
-                        "scripts/train_detector.py",
-                        "--data",
-                        str(fold / "data.yaml"),
-                        "--epochs",
-                        str(args.epochs),
-                        "--seed",
-                        str(args.seed),
-                        "--batch",
-                        str(args.batch),
-                        "--workers",
-                        str(args.workers),
-                        "--project",
-                        str(proyecto),
-                        "--name",
-                        val,
-                    ],
-                    check=True,
-                )
-            # Ultralytics 8.4 antepone runs/detect a un proyecto relativo.
-            candidatos = [pesos, Path("runs/detect") / pesos]
-            pesos = next((c for c in candidatos if c.exists()), pesos)
+                entrenar(python, fold / "data.yaml", proyecto, val, args, modelo, args.epochs)
+            pesos = resolver_pesos(pesos)
             salida = args.out / f"{variante}_{val}.json"
             subprocess.run(
                 [
