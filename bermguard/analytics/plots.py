@@ -35,6 +35,8 @@ matplotlib.use("Agg")  # Sin servidor gráfico: el pipeline corre en un contened
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
 from bermguard.core.types import RiskLevel
@@ -142,7 +144,7 @@ class VideoSeries:
                 self.min_distances[par] = distancia
 
 
-def _preparar_eje(ax: plt.Axes, titulo: str, xlabel: str, ylabel: str) -> None:
+def _preparar_eje(ax: Axes, titulo: str, xlabel: str, ylabel: str) -> None:
     """Aplica el estilo común: rejilla y ejes recesivos, sin marco superior."""
     ax.set_title(titulo, color=TINTA_PRIMARIA, fontsize=12, loc="left", pad=12)
     ax.set_xlabel(xlabel, color=TINTA_SECUNDARIA, fontsize=9)
@@ -157,7 +159,7 @@ def _preparar_eje(ax: plt.Axes, titulo: str, xlabel: str, ylabel: str) -> None:
     ax.tick_params(colors=TINTA_SECUNDARIA, labelsize=8, length=3, width=0.8)
 
 
-def _guardar(fig: plt.Figure, destino: Path) -> None:
+def _guardar(fig: Figure, destino: Path) -> None:
     """Escribe la figura en PNG y SVG.
 
     Ambos formatos porque el enunciado pide «imagen o vectorial»: el PNG sirve para
@@ -356,7 +358,8 @@ def plot_spatial_and_distances(series: VideoSeries, destino: Path) -> None:
     barra = fig.colorbar(imagen, ax=ax_matriz, fraction=0.045, pad=0.04)
     barra.set_label("metros", color=TINTA_SECUNDARIA, fontsize=8)
     barra.ax.tick_params(colors=TINTA_SECUNDARIA, labelsize=8)
-    barra.outline.set_visible(False)
+    # Los stubs de matplotlib tipan `outline` mal según la versión; es un Spine.
+    barra.outline.set_visible(False)  # type: ignore[operator]
 
     nota = "celdas vacías: equipos nunca visibles a la vez"
     if omitidos:

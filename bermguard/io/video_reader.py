@@ -13,6 +13,7 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 from types import TracebackType
+from typing import cast
 
 import cv2
 import numpy as np
@@ -168,7 +169,9 @@ class VideoReader:
             ok, frame = self._capture.read()
             if not ok:
                 break
-            yield index, index / fps, frame
+            # OpenCV tipa el frame como Mat genérico; decodificado de video es
+            # siempre uint8 BGR.
+            yield index, index / fps, cast(ImageBGR, frame)
             index += 1
 
         if index == 0:

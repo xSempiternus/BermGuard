@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Los tests corren sin GPU, sin modelo y sin video: el orquestador depende de
+# Protocol y las etapas se prueban con escenas sinteticas. Por eso basta torch de CPU.
+jobs:
+  quality:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Dependencias
+        run: |
+          pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install -e ".[dev]" --no-deps
+          pip install ruff mypy pytest pytest-cov types-PyYAML
+      - name: Lint
+        run: ruff check . && ruff format --check .
+      - name: Tipos
+        run: mypy bermguard/
+      - name: Tests
+        run: pytest --cov=bermguard --cov-report=term-missing

@@ -156,8 +156,8 @@ class ProximityAnalyzer:
 
         salida: dict[int, RiskLevel] = {}
         for deteccion in activos:
-            distancia = mas_cercano.get(deteccion.track_id)
-            crudo = RiskLevel.SAFE if distancia is None else self._nivel_por_distancia(distancia)
+            cercana = mas_cercano.get(deteccion.track_id)
+            crudo = RiskLevel.SAFE if cercana is None else self._nivel_por_distancia(cercana)
             salida[deteccion.track_id] = self._reportar(deteccion.track_id, crudo)
         return salida
 

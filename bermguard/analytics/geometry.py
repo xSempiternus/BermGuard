@@ -52,7 +52,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from bermguard.core.exceptions import InsufficientDataError
-from bermguard.core.types import Detection, VehicleClass
+from bermguard.core.types import Detection, GrayImage, VehicleClass
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class GroundPlaneModel:
         return lateral, profundidad
 
 
-def estimate_horizon(frame_gray: np.ndarray, variance_threshold: float = 6.0) -> float:
+def estimate_horizon(frame_gray: GrayImage, variance_threshold: float = 6.0) -> float:
     """Fila del horizonte, estimada por la primera fila con textura desde arriba.
 
     El cielo tiene varianza por fila muy baja. Es la misma señal que usa la

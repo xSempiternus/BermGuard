@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
 from bermguard.core.exceptions import ModelLoadError
 from bermguard.core.types import BBox, Detection, ImageBGR, VehicleClass
@@ -103,12 +104,14 @@ class YoloDetector:
         self._quantize: int | None = 16 if (half_precision and device == "cuda") else None
 
         try:
-            from ultralytics import YOLO
+            from ultralytics import YOLO  # type: ignore[attr-defined]
         except ImportError as exc:  # pragma: no cover - fallo de entorno
             raise ModelLoadError("Ultralytics no está instalado") from exc
 
         try:
-            self._model = YOLO(self._weights)
+            # Ultralytics tipa `predict` como unión de Results, Tensor e iteradores
+            # según el modo; acá siempre es una lista de Results.
+            self._model: Any = YOLO(self._weights)
             self._model.to(device)
         except Exception as exc:
             raise ModelLoadError(

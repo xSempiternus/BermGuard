@@ -25,6 +25,10 @@ data/export/
 # manual, no se regeneran de ninguna forma, y pesan 166 KB. Con ellas y el script,
 # el entrenamiento es reproducible sin publicar el metraje.
 data/dataset/images/
+# Cache de etiquetas de Ultralytics: se regenera al leer el dataset.
+data/dataset/labels/*.cache
+# Folds de la validacion cruzada: se regeneran con scripts/cross_validate.py.
+data/cv/
 *.mp4
 *.avi
 *.mov
@@ -54,6 +58,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv*/
 venv/
 env/
 .mypy_cache/

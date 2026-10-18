@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 import numpy as np
 import numpy.typing as npt
@@ -32,6 +32,10 @@ Mask: TypeAlias = npt.NDArray[np.bool_]
 
 FloatArray: TypeAlias = npt.NDArray[np.float32]
 """Señal por columna o por frame. ``NaN`` marca «acá no hay medición válida»."""
+
+GrayImage: TypeAlias = npt.NDArray[Any]
+"""Imagen de un canal, forma ``(H, W)``. El dtype varía por etapa: ``uint8`` tras
+convertir a gris, ``float32`` tras derivar. Lo que fija el contrato es la forma."""
 
 
 # --- Enumeraciones -----------------------------------------------------------

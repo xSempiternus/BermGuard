@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "pytest"]
+dev = ["ruff", "mypy", "pytest", "pytest-cov", "types-PyYAML"]
 
 [tool.setuptools.packages.find]
 include = ["bermguard*"]
@@ -60,6 +60,9 @@ ignore = [
 python_version = "3.10"
 strict = true
 warn_unreachable = true
+# El plugin entiende los campos con valor por defecto de pydantic; sin el, mypy
+# exige todos los argumentos al construir la configuracion.
+plugins = ["pydantic.mypy"]
 # Los paquetes de vision y ML de terceros traen informacion de tipos incompleta
 # o inexistente. Silenciarlos aca mantiene util el --strict sobre nuestro propio
 # codigo, en vez de obligar a relajarlo de forma general.
