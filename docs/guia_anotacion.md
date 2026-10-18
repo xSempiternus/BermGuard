@@ -47,6 +47,24 @@ máquina aparece más lejos de lo que está.
 partida: ese modelo junta el CAEX y el bulldozer cuando están cerca, así que revisé todas,
 separé las fusionadas y corregí la clase de los bulldozers, que llegan todos como `caex`.
 
+## Auditoría (octubre de 2026)
+
+La regla de corregir la clase de las pre-anotaciones no se cumplió del todo. 191 de las 309
+etiquetas de CAEX seguían en formato caja, es decir, sin pasar por la corrección, y entre
+ellas había **29 bulldozers etiquetados como `caex`**. Los encontré revisando las 191 en
+hojas de contacto y los corregí con `scripts/apply_label_audit.py`; el detalle está en
+`data/auditoria_etiquetas.json` y el efecto en las métricas, en el ADR 0009.
+
+Para no repetirlo:
+
+- **Una pre-anotación aceptada sin cambios sigue siendo una pre-anotación.** Si queda en
+  formato caja, es señal de que nadie la miró.
+- **Revisar por clase en hojas de contacto** antes de entrenar: 191 recortes se revisan en
+  minutos y un error de clase salta a la vista. Frame por frame no se ve.
+- **Cuatro casos quedaron abiertos** y están listados en `pendientes` dentro del archivo de
+  auditoría: una caja que junta un CAEX y un bulldozer lejano, que hay que partir, y tres
+  máquinas ambiguas, dos de ellas híbridas inventadas por el generador de video.
+
 ## Limitaciones
 
 - Anoté yo solo, sin acuerdo entre anotadores.

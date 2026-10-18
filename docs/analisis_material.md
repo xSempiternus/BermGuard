@@ -147,3 +147,28 @@ sigue decidiendo la parte visual, y si esta propone una sola masa el prompt no l
 La causa de fondo es la brecha de dominio: dos máquinas ocres, superpuestas, sobre suelo
 ocre, con polvo y a media distancia, cuando estos modelos aprendieron con maquinaria
 fotografiada de cerca y bien iluminada. Por eso descarté el zero-shot (ADR 0002).
+
+## 6. El material es generado con IA
+
+Los cuatro videos los generó el cliente con un modelo de video de Gemini. No es metraje de
+una faena real, y eso se ve en el propio material:
+
+- **La marca de agua de Gemini**, una estrella de cuatro puntas, aparece en la esquina
+  inferior derecha de los frames.
+- **Máquinas híbridas.** En los frames 228 y 234 de `video_02` el generador fundió la hoja
+  de un bulldozer con la carrocería de un CAEX. Es una máquina que no existe; quedó
+  registrada en `data/auditoria_etiquetas.json` y se deja como `caex`.
+
+Lo supe después de diseñar el pipeline, y cambia cómo hay que leer tres resultados:
+
+1. **La altura métrica no tiene un valor verdadero.** Un video generado no respeta un modelo
+   de cámara pinhole ni dimensiones físicas consistentes entre frames. El sesgo de ~4×
+   contra la normativa (reporte, sección 6.2) puede venir del método, pero también de que
+   la escena nunca tuvo una geometría métrica que recuperar. Calibrar la cámara, que era la
+   mejora propuesta, no tiene sentido sobre este material.
+2. **Las cifras de detección son sobre el dominio del generador.** Un detector entrenado con
+   estas máquinas aprendió cómo las dibuja Gemini. Antes de operar sobre una cámara real
+   hay que reentrenarlo o, como mínimo, evaluarlo con metraje real.
+3. **Lo que sí se transfiere es el método:** la partición por video, la evaluación en el
+   punto de operación, el camino óptimo y su validación, la histéresis de las alertas y la
+   arquitectura. Ninguno de esos resultados depende de que la escena sea física.

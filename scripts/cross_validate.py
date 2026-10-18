@@ -150,7 +150,7 @@ def main() -> None:
         "--workers",
         type=int,
         default=0,
-        help="0 en Windows: cada época relanza los workers, que reimportan torch (~45 s).",
+        help="0 en Windows: relanzar los workers en cada época lleva la época de 22 s a 42 s.",
     )
     parser.add_argument("--out", type=Path, default=Path("docs/experimentos/lovo"))
     parser.add_argument("--skip-train", action="store_true", help="Sólo reevaluar")
