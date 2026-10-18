@@ -48,8 +48,8 @@ import numpy as np
 from scipy.ndimage import maximum_filter1d
 from scipy.signal import savgol_filter
 
-from bermguard.core.types import BermPixels, Detection, FloatArray, ImageBGR
-from bermguard.vision.berm.band import search_band
+from bermguard.core.types import BermPixels, Detection, FloatArray, GrayImage, ImageBGR, Mask
+from bermguard.vision.berm.band import hugs_mask, machinery_mask, noise_floor, search_band
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ class ClassicalBermSegmenter:
 
         realzado = self._realzar(frame)
         respuesta = self._respuesta_estructural(realzado)
-        self._anular_maquinaria(respuesta, detections)
+        maquinaria = self._anular_maquinaria(respuesta, detections)
 
         y_min, y_max = self._banda_de_busqueda(realzado, detections)
         if y_max - y_min < 16:
@@ -166,9 +166,14 @@ class ClassicalBermSegmenter:
         # el pretil. Un multiplo de la mediana de la banda si es informativo, porque
         # una escena sin estructura horizontal da cobertura baja y una con pretil
         # nitido da cobertura alta.
-        suelo_de_ruido = float(np.median(banda))
-        corte = max(self._noise_multiple * suelo_de_ruido, pico * 0.05)
-        valida = fuerza > corte
+        #
+        # El suelo de ruido es la mediana de la respuesta **positiva** fuera de la
+        # maquinaria (ver :func:`band.noise_floor`). La version anterior tomaba la
+        # mediana de toda la banda, que es cero porque el gradiente esta rectificado;
+        # el corte quedaba en el 5 % del pico y una banda de puro ruido salia con 83 %
+        # de cobertura, igual que una con pretil.
+        corte = max(self._noise_multiple * noise_floor(banda, maquinaria[y_min:y_max]), pico * 0.05)
+        valida = (fuerza > corte) & ~hugs_mask(maquinaria, cresta_local + y_min)
         if valida.sum() < ancho * 0.1:
             return None
 
@@ -188,7 +193,7 @@ class ClassicalBermSegmenter:
 
     # --- Etapas ---------------------------------------------------------------
 
-    def _realzar(self, frame: ImageBGR) -> np.ndarray:
+    def _realzar(self, frame: ImageBGR) -> GrayImage:
         """Convierte a luminancia y ecualiza el contraste localmente.
 
         CLAHE y no ecualización global: la escena nocturna tiene zonas saturadas
@@ -198,26 +203,24 @@ class ClassicalBermSegmenter:
         gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         return self._clahe.apply(gris)
 
-    def _respuesta_estructural(self, realzado: np.ndarray) -> np.ndarray:
+    def _respuesta_estructural(self, realzado: GrayImage) -> GrayImage:
         """Gradiente vertical positivo a escala gruesa."""
         k = int(self._blur_sigma * 6) | 1
         suave = cv2.GaussianBlur(realzado, (k, k), self._blur_sigma)
         gy = cv2.Scharr(suave, cv2.CV_32F, 0, 1)
         return np.maximum(gy, 0.0)
 
-    def _anular_maquinaria(self, respuesta: np.ndarray, detections: Sequence[Detection]) -> None:
-        """Pone a cero la respuesta dentro de las cajas de maquinaria, in situ."""
-        alto, ancho = respuesta.shape
-        d = self._box_dilation
-        for deteccion in detections:
-            x1, y1, x2, y2 = deteccion.bbox.as_tuple()
-            respuesta[
-                max(0, int(y1) - d) : min(alto, int(y2) + d),
-                max(0, int(x1) - d) : min(ancho, int(x2) + d),
-            ] = 0.0
+    def _anular_maquinaria(self, respuesta: GrayImage, detections: Sequence[Detection]) -> Mask:
+        """Pone a cero la respuesta dentro de las cajas de maquinaria, in situ.
+
+        Devuelve la máscara para descartar después las columnas pegadas a su borde.
+        """
+        mascara = machinery_mask(respuesta.shape, detections, self._box_dilation)
+        respuesta[mascara] = 0.0
+        return mascara
 
     def _banda_de_busqueda(
-        self, realzado: np.ndarray, detections: Sequence[Detection]
+        self, realzado: GrayImage, detections: Sequence[Detection]
     ) -> tuple[int, int]:
         """Acota verticalmente la búsqueda. Ver :func:`band.search_band`.
 
@@ -232,7 +235,7 @@ class ClassicalBermSegmenter:
             vehicle_height_multiple=self._vehicle_height_multiple,
         )
 
-    def _camino_de_cresta(self, banda: np.ndarray) -> np.ndarray:
+    def _camino_de_cresta(self, banda: GrayImage) -> GrayImage:
         """Camino de máxima respuesta acumulada, con salto vertical acotado.
 
         Programación dinámica clásica sobre la rejilla fila-columna. Hacia adelante
@@ -312,7 +315,7 @@ class ClassicalBermSegmenter:
         self._crest_previa = mezcla
         return mezcla
 
-    def _estimar_base(self, respuesta: np.ndarray, cresta: FloatArray, y_max: int) -> FloatArray:
+    def _estimar_base(self, respuesta: GrayImage, cresta: FloatArray, y_max: int) -> FloatArray:
         """Localiza el pie del pretil descendiendo desde la cresta.
 
         La base es donde la cara del pretil se encuentra con la rasante: bajando

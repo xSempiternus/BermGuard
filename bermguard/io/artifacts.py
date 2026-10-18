@@ -94,7 +94,19 @@ class VideoMetadata(_Base):
     umbral de validación y no por la escena (ADR 0006).
 
     Un pretil físico cambia lentísimo, de modo que todo jitter por encima del ruido
-    de cuantización es error de medición, no señal."""
+    de cuantización es error de medición, no señal.
+
+    Se conserva por continuidad con los reportes anteriores, pero tiene un defecto:
+    compara la mediana de cada frame, que cambia cuando cambia el conjunto de
+    columnas válidas. Ver ``berm_crest_jitter_col_px``."""
+
+    berm_crest_jitter_col_px: float | None = None
+    """Cambio mediano de la cresta columna a columna entre frames consecutivos de una
+    misma toma, promediado sobre los pares de frames, en píxeles.
+
+    Sólo compara columnas medidas en ambos frames, así que no confunde un cambio de
+    cobertura con un movimiento del perfil. Es la métrica de estabilidad principal
+    desde la revisión de octubre de 2026."""
 
     runtime: dict[str, str | bool] = Field(default_factory=dict)
     code_version: str | None = None
@@ -166,4 +178,5 @@ def write_csv(rows: list[dict[str, object]], path: Path) -> None:
 
 def read_json(path: Path) -> dict[str, object]:
     """Lee un JSON de artefactos, para el comparativo del benchmark."""
-    return json.loads(path.read_text(encoding="utf-8"))
+    contenido: dict[str, object] = json.loads(path.read_text(encoding="utf-8"))
+    return contenido

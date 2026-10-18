@@ -32,11 +32,11 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from bermguard.core.types import Detection
+from bermguard.core.types import Detection, GrayImage, Mask
 
 
 def search_band(
-    realzado: np.ndarray,
+    realzado: GrayImage,
     detections: Sequence[Detection],
     sky_variance_threshold: float = 6.0,
     band_margin_frac: float = 0.04,
@@ -85,3 +85,66 @@ def search_band(
     y_min = max(y_cielo, int(techo))
 
     return y_min, max(y_min, y_max)
+
+
+def machinery_mask(
+    shape: tuple[int, ...], detections: Sequence[Detection], dilation_px: int
+) -> Mask:
+    """Máscara de las cajas de maquinaria, ensanchadas ``dilation_px`` por lado.
+
+    El pretil es terreno: una máquina produce bordes mucho más marcados que un banco
+    de tierra, así que su región se anula en la respuesta antes de buscar.
+    """
+    alto, ancho = shape[0], shape[1]
+    mascara = np.zeros((alto, ancho), dtype=bool)
+    for deteccion in detections:
+        x1, y1, x2, y2 = deteccion.bbox.as_tuple()
+        mascara[
+            max(0, int(y1) - dilation_px) : min(alto, int(y2) + dilation_px),
+            max(0, int(x1) - dilation_px) : min(ancho, int(x2) + dilation_px),
+        ] = True
+    return mascara
+
+
+def hugs_mask(mask: Mask, rows: GrayImage, radius_px: int = 2) -> Mask:
+    """Columnas cuya fila elegida queda pegada al borde de la máscara de maquinaria.
+
+    Anular una caja deja un borde artificial: justo fuera de la máscara la respuesta
+    es la del ruido, y en las columnas tapadas es lo único disponible. Medido en una
+    escena sintética, el camino óptimo cruzaba bajo la caja por la primera fila sin
+    máscara en 59 de 190 columnas ocultas. Detrás de una máquina el pretil no es
+    observable, así que esas columnas se declaran sin medición en vez de reportar el
+    borde de la caja como cresta.
+
+    Args:
+        mask: Máscara de :func:`machinery_mask`.
+        rows: Fila absoluta elegida en cada columna.
+        radius_px: Distancia a la máscara bajo la cual la elección se descarta.
+    """
+    alto = mask.shape[0]
+    columnas = np.arange(mask.shape[1])
+    pegada = np.zeros(mask.shape[1], dtype=bool)
+    for desplazamiento in range(-radius_px, radius_px + 1):
+        filas = np.clip(rows.astype(np.int64) + desplazamiento, 0, alto - 1)
+        pegada |= mask[filas, columnas]
+    return pegada
+
+
+def noise_floor(band: GrayImage, masked: Mask) -> float:
+    """Nivel de ruido de la respuesta estructural dentro de la banda.
+
+    La respuesta es un gradiente rectificado: la mitad de los píxeles de una zona sin
+    estructura valen cero, así que la mediana de la banda completa es cero y no
+    describe nada. La mediana de la parte **positiva**, fuera de las cajas anuladas,
+    sí mide cuánto responde el terreno sin pretil.
+
+    En una escena sintética con la cresta fuera de la banda, un corte de 3 veces este
+    nivel acepta el 0 % de las columnas; con la cresta dentro, el 71-81 %. La mediana
+    de la banda completa aceptaba el 83 % en ambos casos.
+
+    Returns:
+        El nivel de ruido, o 0 si la banda no tiene respuesta positiva libre.
+    """
+    libre = band[~masked]
+    positiva = libre[libre > 0]
+    return float(np.median(positiva)) if positiva.size else 0.0

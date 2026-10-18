@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
@@ -42,6 +42,7 @@ from bermguard.core.interfaces import (
 )
 from bermguard.core.types import (
     Detection,
+    FloatArray,
     FrameResult,
     LightingCondition,
     RiskLevel,
@@ -116,7 +117,7 @@ class Orchestrator:
             min_length=self._config.shots.min_length,
         )
 
-        latencias_por_etapa: Counter[str] = Counter()
+        latencias_por_etapa: defaultdict[str, float] = defaultdict(float)
         latencias_frame: list[float] = []
         conteo_luz: Counter[LightingCondition] = Counter()
         riesgo_previo: dict[int, RiskLevel] = {}
@@ -124,6 +125,8 @@ class Orchestrator:
         coberturas: list[float] = []
         frames_sin_pretil = 0
         crestas_por_toma: list[list[float]] = [[]]
+        cresta_previa: FloatArray | None = None
+        saltos_por_columna: list[float] = []
         filas_perfil: list[dict[str, object]] = []
         filas_eventos: list[dict[str, object]] = []
         avisos: list[str] = []
@@ -150,6 +153,7 @@ class Orchestrator:
                             # salto enorme que no es error de medicion sino cambio
                             # de camara, y mezclarlo falsearia la metrica.
                             crestas_por_toma.append([])
+                            cresta_previa = None
 
                     with _cronometro(etapas, "lighting"):
                         # El gris se calcula una vez y sirve a dos consumidores: la
@@ -221,9 +225,14 @@ class Orchestrator:
                     if self._berm_segmenter is not None:
                         if pixeles is None:
                             frames_sin_pretil += 1
+                            cresta_previa = None
                         else:
                             coberturas.append(pixeles.coverage)
                             crestas_por_toma[-1].append(_nanmediana(pixeles.crest_y_px))
+                            salto = _salto_por_columna(cresta_previa, pixeles.crest_y_px)
+                            if salto is not None:
+                                saltos_por_columna.append(salto)
+                            cresta_previa = pixeles.crest_y_px
 
                     resultado = FrameResult(
                         index=index,
@@ -256,6 +265,18 @@ class Orchestrator:
         transcurrido = time.perf_counter() - inicio
         if frames == 0:
             raise RuntimeError(f"No se escribio ningun frame para {video}")
+
+        esperados = info.frame_count if max_frames is None else min(info.frame_count, max_frames)
+        if esperados > 0 and frames < 0.95 * esperados:
+            # El conteo del contenedor es una pista, pero quedarse muy por debajo no es
+            # ruido del contenedor: es una decodificacion que se corto. Paso con poca
+            # memoria: el video termino a los 2 frames y la corrida parecia valida.
+            mensaje = (
+                f"Se decodificaron {frames} de {esperados} frames declarados; "
+                "el video pudo cortarse por un error de lectura."
+            )
+            logger.warning("%s: %s", video.name, mensaje)
+            avisos.append(mensaje)
 
         if self._tracker is None:
             avisos.append(
@@ -292,6 +313,11 @@ class Orchestrator:
                 frames_sin_pretil / frames if self._berm_segmenter is not None else None
             ),
             berm_crest_jitter_px=_jitter_por_toma(crestas_por_toma),
+            berm_crest_jitter_col_px=(
+                round(float(sum(saltos_por_columna) / len(saltos_por_columna)), 3)
+                if saltos_por_columna
+                else None
+            ),
             runtime=describe_runtime(self._device),
             code_version=code_version(),
             warnings=avisos,
@@ -411,6 +437,25 @@ def _jitter_por_toma(series_por_toma: list[list[float]]) -> float | None:
         if validos.size >= 2:
             diferencias.extend(np.abs(np.diff(validos)).tolist())
     return round(float(np.std(diferencias)), 3) if diferencias else None
+
+
+def _salto_por_columna(previa: FloatArray | None, actual: FloatArray) -> float | None:
+    """Mediana del cambio de la cresta columna a columna entre dos frames seguidos.
+
+    Compara sólo las columnas medidas en ambos frames. La métrica anterior comparaba
+    la mediana de cada frame, y esa mediana se mueve cuando cambia *qué* columnas son
+    válidas aunque el pretil esté quieto: en una secuencia sintética que se mueve
+    0.08 px por frame daba 2.2 px. Se exige que el 10 % de las columnas coincida para
+    que la comparación describa el perfil y no un puñado de puntos.
+    """
+    import numpy as np
+
+    if previa is None or previa.shape != actual.shape:
+        return None
+    ambas = np.isfinite(previa) & np.isfinite(actual)
+    if ambas.sum() < 0.1 * actual.size:
+        return None
+    return float(np.median(np.abs(actual[ambas] - previa[ambas])))
 
 
 def _nanmediana(serie: object) -> float:

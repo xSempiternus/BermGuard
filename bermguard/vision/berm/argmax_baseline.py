@@ -35,8 +35,8 @@ import numpy as np
 from scipy.ndimage import median_filter
 from scipy.signal import savgol_filter
 
-from bermguard.core.types import BermPixels, Detection, FloatArray, ImageBGR
-from bermguard.vision.berm.band import search_band
+from bermguard.core.types import BermPixels, Detection, FloatArray, GrayImage, ImageBGR
+from bermguard.vision.berm.band import hugs_mask, machinery_mask, noise_floor, search_band
 
 logger = logging.getLogger(__name__)
 
@@ -109,13 +109,8 @@ class ArgmaxBermSegmenter:
         suave = cv2.GaussianBlur(realzado, (k, k), self._blur_sigma)
         respuesta = np.maximum(cv2.Scharr(suave, cv2.CV_32F, 0, 1), 0.0)
 
-        d = self._box_dilation
-        for deteccion in detections:
-            x1, y1, x2, y2 = deteccion.bbox.as_tuple()
-            respuesta[
-                max(0, int(y1) - d) : min(alto, int(y2) + d),
-                max(0, int(x1) - d) : min(ancho, int(x2) + d),
-            ] = 0.0
+        maquinaria = machinery_mask(respuesta.shape, detections, self._box_dilation)
+        respuesta[maquinaria] = 0.0
 
         # Misma banda que el Metodo 1, del modulo compartido: la comparacion del
         # benchmark solo es valida si ambos buscan en la misma region.
@@ -138,8 +133,9 @@ class ArgmaxBermSegmenter:
         cresta_local = banda.argmax(axis=0)
         fuerza = banda[cresta_local, np.arange(ancho)]
 
-        corte = max(self._noise_multiple * float(np.median(banda)), pico * 0.05)
-        valida = fuerza > corte
+        corte = max(self._noise_multiple * noise_floor(banda, maquinaria[y_min:y_max]), pico * 0.05)
+        # Mismo descarte que el Metodo 1: el borde de una caja no es una cresta.
+        valida = (fuerza > corte) & ~hugs_mask(maquinaria, cresta_local + y_min)
         if valida.sum() < ancho * 0.1:
             return None
 
@@ -188,7 +184,7 @@ class ArgmaxBermSegmenter:
         return salida
 
     @staticmethod
-    def _estimar_base(respuesta: np.ndarray, cresta: FloatArray, y_max: int) -> FloatArray:
+    def _estimar_base(respuesta: GrayImage, cresta: FloatArray, y_max: int) -> FloatArray:
         """Idéntico al del Método 1, para que la comparación aísle la cresta."""
         alto, ancho = respuesta.shape
         fin = min(alto, y_max + int(alto * 0.10))
