@@ -11,8 +11,8 @@ modelo preentrenado sirve para los cuatro folds de ``cross_validate.py`` sin fug
 
 Uso:
     python scripts/prepare_pretrain.py \\
-        --source data/externos/dji_65 --source data/externos/bulldozer-lpoe2 \\
-        --map dozer=bulldozer bull_dozer=bulldozer tippertruck=caex \\
+        --source data/externos/mines --source data/externos/bulldozer-lpoe2 \\
+        --map dozer=bulldozer bull_dozer=bulldozer dumper=caex dumb_truck=caex \\
         --require bulldozer
 """
 
@@ -58,8 +58,9 @@ def main() -> None:
         choices=CLASES_PROYECTO,
         help=(
             "Conservar sólo imágenes con al menos una instancia de esta clase. Con "
-            "'bulldozer', de dji_65 quedan sólo los frames con dozer; sus tolvas siguen "
-            "etiquetadas como caex, porque sin etiqueta enseñarían que un camión es fondo"
+            "'bulldozer' se descartan las imágenes sin dozer; en las que quedan, los "
+            "camiones siguen etiquetados como caex, porque sin etiqueta enseñarían que un "
+            "camión es fondo"
         ),
     )
     args = parser.parse_args()
