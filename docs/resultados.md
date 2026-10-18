@@ -1,6 +1,6 @@
 # Resultados
 
-Resultados del sistema final, separados por objetivo:
+Resultados del sistema, separados por objetivo:
 
 1. **Detectar CAEX y bulldozers y medir la proximidad entre ellos.**
 2. **Medir la altura del pretil.**
@@ -10,10 +10,19 @@ análisis, la conclusión de cada objetivo y lo que queda por hacer. La comparac
 métodos (zero-shot contra fine-tuning, camino óptimo contra argmax, CPU contra GPU) está en
 [`reporte_benchmark.md`](../reporte_benchmark.md).
 
+> **Revisión de octubre de 2026.** Medir mejor cambió varias cifras de la versión anterior
+> de este documento: las del detector no eran las del punto de operación, 29 bulldozers
+> estaban etiquetados como CAEX, y la validación del pretil aceptaba ruido. Las cifras
+> anteriores se conservan en `docs/experimentos/` y cada corrección tiene su ADR (0008, 0009
+> y 0010). Además, el material resultó ser generado con IA (`docs/analisis_material.md`,
+> sección 6), lo que cambia cómo leer la altura métrica.
+
 ```bash
-python scripts/split_dataset.py data/export --out data/dataset --val video_04
-python scripts/train_detector.py --data data/dataset/data.yaml --epochs 80
-python scripts/eval_detector.py
+python scripts/apply_label_audit.py --check
+python scripts/evaluate_detector.py --weights weights/detector_v1.pt \
+    --images data/dataset/images/val --labels data/dataset/labels/val \
+    --out docs/experimentos/detector_v1_val.json
+python scripts/benchmark_berm_synthetic.py --out docs/experimentos/pretil_sintetico.json
 python main.py --input data/raw --output output --method all
 ```
 
@@ -23,67 +32,96 @@ python main.py --input data/raw --output output --method all
 
 ### 1.1 Datos
 
-171 frames anotados a mano, estratificados por condición de luz y separados por video.
+171 frames anotados a mano, estratificados por condición de luz y separados por video. La
+tabla ya incluye la auditoría de etiquetas (ADR 0009): 29 bulldozers que estaban marcados
+como `caex` pasaron a su clase.
 
 | Partición | Imágenes | `caex` | `bulldozer` |
 |---|---|---|---|
-| train (`video_01`, `02`, `03`) | 131 | 270 | 33 |
-| val (`video_04` completo) | 40 | 39 | 11 |
-| **Total** | **171** | **309** | **44** |
+| train (`video_01`, `02`, `03`) | 131 | 246 | 57 |
+| val (`video_04` completo) | 40 | 34 | 16 |
+| **Total** | **171** | **280** | **73** |
 
-Hay 7 CAEX por cada bulldozer. Viene del material: en `video_01` hay cuatro o cinco CAEX a
-la vez y un solo bulldozer, y en los otros clips el bulldozer se ve más chico, tapado por el
-polvo o fuera de cuadro.
-
-Separé por video y no al azar porque dos frames cercanos son casi la misma imagen, y con una
-partición aleatoria la validación premiaría memorizar. Dejé `video_04` para validación y no
-`video_03` porque este solo tiene 4 bulldozers: con 4 objetos, fallar uno mueve el resultado
-un 25 %.
+Antes de la auditoría la proporción era de 7 CAEX por bulldozer; ahora es de 4. Separé por
+video y no al azar porque dos frames cercanos son casi la misma imagen, y con una partición
+aleatoria la validación premiaría memorizar.
 
 ### 1.2 Entrenamiento
 
-Desde `yolo11s.pt` (COCO), con un máximo de 80 épocas, `batch=8`, `imgsz=640`, precisión
-mixta y semilla 0. Se detuvo por paciencia en la época 42 y la mejor fue la 22. Las curvas
-están en `docs/entrenamiento/` y los pesos en `weights/detector_v1.pt`.
+`detector_v1` se entrenó desde `yolo11s.pt` (COCO), con un máximo de 80 épocas, `batch=8`,
+`imgsz=640`, precisión mixta y semilla 0, **con las etiquetas anteriores a la auditoría**.
+Se detuvo por paciencia en la época 42 y la mejor fue la 22. Reentrenarlo con las etiquetas
+corregidas, y medir el copy-paste de bulldozers, es el siguiente paso (sección 4).
 
 ### 1.3 Métricas del detector
 
-Sobre `video_04`, que el modelo no vio al entrenar:
+Sobre `video_04`, que el modelo no vio al entrenar, con las etiquetas auditadas y **en el
+punto de operación del pipeline**: confianza 0.25 y NMS 0.45. Entre corchetes, el intervalo
+de confianza del 95 % por bootstrap de bloques de 5 frames anotados consecutivos
+(`docs/experimentos/detector_v1_val.json`).
 
-| Clase | mAP@0.5 | mAP@0.5:0.95 | Precisión | Recall |
+| Clase | AP@0.5 | Precisión | Recall | Objetos |
 |---|---|---|---|---|
-| `caex` | 0.812 | 0.585 | 0.297 | **1.000** |
-| `bulldozer` | **0.306** | 0.188 | 0.464 | 0.455 |
-| global | 0.559 | 0.387 | 0.381 | 0.727 |
+| `caex` | 0.668 [0.46–0.89] | 0.526 [0.40–0.70] | 0.882 [0.77–0.97] | 34 |
+| `bulldozer` | 0.586 [0.27–0.96] | — | **0.000** | 16 |
 
-#### Qué mide el mAP y por qué lo uso
+El bulldozer no tiene precisión porque al umbral 0.25 el modelo no emite ninguna detección
+de esa clase: todas sus predicciones quedan bajo 0.1.
+
+#### Qué cambió respecto de la versión anterior
+
+| | Versión anterior | Ahora | Por qué |
+|---|---|---|---|
+| Precisión `caex` | 0.297 | 0.526 | Ultralytics reporta P y R en el umbral de máximo F1, no en el de operación |
+| Recall `caex` | 1.000 | 0.882 | Ídem |
+| AP `bulldozer` | 0.306 | 0.586 | 5 bulldozers de validación estaban etiquetados como CAEX |
+| AP `caex` | 0.812 | 0.668 | Lo mismo, y el NMS de operación (0.45) en vez del de validación (0.7) |
+
+Con las etiquetas originales, el mismo evaluador da AP 0.734 para `caex` y 0.313 para
+`bulldozer`, que es lo que reportaba Ultralytics (0.812 y 0.306) salvo por el NMS y por
+cómo arma los lotes (ADR 0009).
+
+#### Qué mide el AP y por qué lo uso
 
 Para cada clase, las detecciones se ordenan por confianza. Una detección cuenta como
 correcta si su caja se superpone al menos un 50 % con una caja anotada (IoU ≥ 0.5). Bajando
-el umbral de confianza paso a paso se calculan la precisión y el recall, y eso dibuja la
-curva precisión-recall. El AP es el área bajo esa curva (1 es perfecto) y el mAP es el
-promedio entre clases. El mAP@0.5 exige un 50 % de superposición; el mAP@0.5:0.95 promedia
-exigencias de 50 % a 95 %, así que también mide qué tan ajustada queda la caja.
+el umbral paso a paso se calculan la precisión y el recall, y eso dibuja la curva
+precisión-recall. El AP es el área bajo esa curva (1 es perfecto). Lo reporto por clase
+porque con clases desbalanceadas el promedio lo domina la grande.
 
-Es la métrica estándar en detección (COCO, Pascal VOC, Ultralytics) y resume en un número si
-el modelo encuentra los objetos, si inventa y si ubica bien la caja, sin depender de un
-umbral elegido a mano. Uso mAP@0.5 porque para alertar me importa encontrar la máquina, no
-ajustar la caja al píxel, y lo reporto por clase porque con un desbalance de 7:1 el promedio
-lo domina la clase grande.
+El AP no dice cómo se comporta el modelo en un umbral concreto, así que lo acompaño con la
+precisión y el recall **en el umbral con el que corre el sistema**, que además separan los
+dos tipos de error. En seguridad no pesan igual: un error de precisión es una falsa alarma;
+uno de recall es un equipo sin vigilar.
 
-El mAP no dice cómo se comporta el modelo en un umbral concreto, así que lo acompaño con la
-precisión y el recall, que además separan los dos tipos de error. En seguridad no pesan
-igual:
+### 1.4 Umbral y condición de luz
 
-- **Precisión:** de lo que el modelo marcó como máquina, cuánto lo era. Un error aquí es una
-  falsa alarma.
-- **Recall:** de las máquinas reales, cuántas encontró. Un error aquí es un equipo sin
-  vigilar.
+**El umbral global borra al bulldozer.** Barrido de umbral en `video_04`:
 
-La curva precisión-recall está en `docs/entrenamiento/BoxPR_curve.png` y la matriz de
-confusión en `docs/entrenamiento/confusion_matrix_normalized.png`.
+| Umbral | Precisión `bulldozer` | Recall `bulldozer` | Precisión `caex` | Recall `caex` |
+|---|---|---|---|---|
+| 0.05 | 0.73 | 0.50 | 0.26 | 0.94 |
+| 0.10 | 1.00 | 0.06 | 0.33 | 0.91 |
+| 0.25 | — | 0.00 | 0.53 | 0.88 |
 
-### 1.4 Separación de máquinas
+Un umbral propio para el bulldozer (0.05) recuperaría la mitad de los bulldozers con 73 %
+de precisión. El pipeline ya lo soporta (`detector.class_confidence`), pero **no lo activé**:
+elegir el umbral mirando `video_04` y reportar sobre `video_04` sería ajustar sobre la
+validación. El valor se tiene que elegir con la validación cruzada de los otros tres videos.
+
+**Por condición de luz** (pendiente desde el ADR 0005):
+
+| Condición | Imágenes | AP `caex` | Objetos `caex` |
+|---|---|---|---|
+| día | 13 | 0.29 | 9 |
+| crepúsculo | 4 | 1.00 | 2 |
+| noche | 23 | 0.82 | 23 |
+
+El CAEX rinde peor de día que de noche, contra lo que esperaba. Con 9 objetos diurnos el
+intervalo es muy ancho, así que no lo trato como un hallazgo sino como algo a revisar con
+más datos.
+
+### 1.5 Separación de máquinas
 
 La proximidad necesita que cada máquina tenga su propia caja. En el frame 120 de
 `video_02`, con un CAEX y un bulldozer juntos:
@@ -91,16 +129,15 @@ La proximidad necesita que cada máquina tenga su propia caja. En el frame 120 d
 | Modelo | Detecciones | Cajas |
 |---|---|---|
 | `yolo11s` COCO | 1 | `truck` 0.74, x=[138,759], **622 px, las dos máquinas** |
-| `detector_v1` | 2 | `caex` 0.48, x=[480,765], 285 px, **el bulldozer**<br>`caex` 0.43, x=[65,614], 549 px, **el CAEX** |
+| `detector_v1` | 2 | 0.48, x=[480,765], 285 px, **el bulldozer**<br>0.43, x=[65,614], 549 px, **el CAEX** |
 
-### 1.5 Proximidad
+Ver `docs/showcase/img/separacion_coco_vs_propio.png`.
+
+### 1.6 Proximidad
 
 Cada equipo queda en nivel seguro, precaución (a menos de 20 m de otro) o crítico (a menos
 de 10 m). Para que el nivel no parpadee, sube después de 3 frames seguidos y baja después de
-10. Una alerta es una **subida de nivel**, no un frame en riesgo: un equipo diez segundos en
-zona crítica es un evento, no doscientas alertas.
-
-Corrida de `output_ejemplo/`:
+10. Una alerta es una **subida de nivel**, no un frame en riesgo.
 
 | Video | Alertas | Distancia mínima | Mediana |
 |---|---|---|---|
@@ -109,16 +146,9 @@ Corrida de `output_ejemplo/`:
 | `video_03` | 16 | 4.3 m | 19.4 m |
 | `video_04` | 13 | 0.9 m | 19.3 m |
 
-El tracker tiene dos mecanismos contra las detecciones falsas:
-
-| Mecanismo | Efecto medido |
-|---|---|
-| Confirmar un track solo después de 3 detecciones seguidas | Elimina falsos positivos aislados sobre polvo |
-| Eliminar cajas duplicadas sobre la misma máquina | Alertas de 43 a 39 en `video_01`; distancia mínima de 0.6 a 2.9 m en `video_02` |
-
-Para detectar duplicados uso la intersección sobre el área de la caja más chica y no el IoU:
-dos cajas desplazadas sobre el mismo camión tienen un IoU de ~0.35, igual que dos equipos
-reales, pero una queda casi contenida en la otra.
+El tracker confirma un track solo después de 3 detecciones seguidas y suprime las cajas
+duplicadas por contención (intersección sobre el área de la menor), lo que bajó las
+alertas de 43 a 39 en `video_01`. Los tests fijan la histéresis (`tests/test_proximidad.py`).
 
 ---
 
@@ -126,51 +156,62 @@ reales, pero una queda casi contenida en la otra.
 
 ### 2.1 Cómo se mide
 
-El Método 1 (ADR 0006) encuentra la cresta y la base del pretil en la imagen. La altura sale
-de:
+El Método 1 (ADR 0006) encuentra la cresta y la base del pretil como un camino óptimo, a
+media resolución (ADR 0010). La altura sale de:
 
 ```
 H = (y_base − y_cresta) · h / (y_base − y_horizonte)
 ```
 
-donde `h` es la altura de la cámara, que se estima con el ancho nominal de un CAEX
-detectado. La focal se cancela, así que el resultado no depende del campo de visión
-asumido. Cada medición lleva una banda de incertidumbre: la dispersión entre los equipos
-usados como referencia, con un mínimo de ±20 % cuando hay uno solo.
+donde `h` es la altura de la cámara, estimada con el ancho nominal de un CAEX detectado. La
+focal se cancela, y hay tests que lo verifican con casos calculados a mano
+(`tests/test_metrologia.py`).
 
-### 2.2 Métricas
+### 2.2 Exactitud, por primera vez
 
-No tengo alturas reales medidas en terreno, así que no puedo calcular un error directo (MAE
-o R²). Uso tres medidas que no necesitan esos datos.
+Sobre escenas sintéticas con la cresta conocida (ADR 0008), fracción de columnas a 5 px o
+menos de la cresta verdadera, 20 escenas por punto:
 
-**Estabilidad de la curva (jitter).** Cuánto se mueve la cresta de un frame al siguiente
-dentro de una misma toma, en píxeles. Es lo que el enunciado penaliza como parpadeo. En
-promedio sobre los 4 videos, 14.57 px con el Método 1 y 26.17 px con el Método 2. Por
-condición de luz:
-
-| Condición | Jitter Método 1 | Jitter Método 2 | Frames |
+| Contraste de la cresta | Huellas | Camino óptimo | Argmax + filtro |
 |---|---|---|---|
-| día | **15.30 px** | 30.26 px | 424 |
-| crepúsculo | **17.04 px** | 42.35 px | 94 |
-| noche | **19.21 px** | 33.46 px | 473 |
+| 18 | 0 | 100 % | 100 % |
+| 18 | 6 | **90 %** | 75 % |
+| 18 | 12 | **60 %** | 49 % |
+| 12 | 4 | **71 %** | 59 % |
+| 8 | 6 | 17 % | 21 % |
 
-**Variación de la altura con la luz.** Un pretil no cambia de altura al oscurecer, así que
-la diferencia entre día y noche es error de medición y sirve como piso del error:
+El camino óptimo gana cuando la cresta es visible. Cuando es más débil que las huellas no
+gana ninguno. Es exactitud de la formulación en condiciones controladas, no del sistema
+sobre el material.
 
-| Condición | Altura mediana (Método 1) |
-|---|---|
-| día | 0.33 m |
-| crepúsculo | 0.36 m |
-| noche | 0.42 m |
+### 2.3 Estabilidad en el material
 
-Son ±12 % en torno a la mediana global de 0.38 m. Antes del ADR 0007 eran ±26 %.
+Jitter por columna: el cambio mediano de la cresta, columna a columna, entre dos frames
+seguidos de la misma toma, contando solo las columnas medidas en ambos (ADR 0008).
 
-**Comparación con la normativa.** La normativa pide un pretil de al menos el radio de rueda
-del equipo mayor, del orden de 1.5–2 m. La mediana medida, 0.38 m, es unas cuatro veces
-menor.
+| Video | Cobertura M1 | Jitter M1 | Jitter M2 |
+|---|---|---|---|
+| `video_01` (1080p, 3 tomas) | 0.69 | **5.71 px** | 6.75 px |
+| `video_02` | 0.52 | **0.60 px** | 0.63 px |
+| `video_03` | 0.49 | **0.95 px** | 1.51 px |
+| `video_04` | 0.56 | **2.14 px** | 2.91 px |
 
-La cobertura (qué parte de la curva se da por válida, 89.3 %) no la uso como métrica porque
-depende del umbral de validación y no de la escena (reporte, sección 4.3).
+La cobertura bajó de ~0.9 a 0.5–0.7 respecto de la versión anterior porque ahora la
+validación deja de contar ruido como pretil. En el frame 130 de `video_04`, donde la curva
+antes seguía las huellas de neumático con 85 % de cobertura, ahora el método se abstiene.
+
+### 2.4 Variación con la luz
+
+Un pretil no cambia de altura al oscurecer, así que la diferencia entre condiciones es error
+de medición y sirve como piso del error (Método 1, los cuatro videos):
+
+| Condición | Altura mediana | Frames |
+|---|---|---|
+| día | 0.35 m | 429 |
+| crepúsculo | 0.37 m | 106 |
+| noche | 0.44 m | 479 |
+
+Son ±11 % en torno a la mediana global de 0.41 m.
 
 ---
 
@@ -178,105 +219,68 @@ depende del umbral de validación y no de la escena (reporte, sección 4.3).
 
 ### 3.1 Detección y proximidad
 
-**El mAP global esconde el problema.** 0.559 es moderado (un detector bien entrenado con
-muchos datos anda entre 0.80 y 0.90), pero promedia un `caex` usable (0.812) con un
-`bulldozer` que no lo es (0.306).
+**El problema principal no era la precisión del CAEX, sino el bulldozer.** La versión
+anterior decía que el detector "inventaba el 70 % de sus cajas"; en el umbral de operación
+inventa el 47 % y pierde el 12 % de los camiones. El problema serio es otro: el bulldozer
+nunca supera el umbral, así que en operación el sistema no ve bulldozers como tales.
 
-**La matriz de confusión y el mAP no se contradicen.** La matriz muestra la fila de
-`bulldozer` vacía, como si nunca se predijera, pero el mAP es 0.306. La diferencia es el
-umbral: la matriz usa un umbral de confianza fijo y el mAP recorre todos. El modelo sí
-predice `bulldozer`, pero casi siempre bajo 0.25, el umbral de operación de
-`configs/method_1.yaml`, así que en la práctica el OSD marca todo como `caex`.
+**La causa era sobre todo de datos, y una parte estaba en las etiquetas.** El modelo
+aprendió con 24 bulldozers etiquetados como CAEX, la clase contraria. Con la etiqueta
+corregida en validación su AP sube de 0.31 a 0.59: el modelo distinguía más de lo que se le
+reconocía, pero con confianzas bajas, que es lo esperable cuando el entrenamiento le dice
+dos cosas opuestas.
 
-**La precisión baja se convierte en falsas alertas.** `caex` tiene recall 1.000 y precisión
-0.297: encuentra todos los camiones, pero ~70 % de sus cajas no corresponde a ninguno. En el
-frame 120 de `video_02`, el NMS por defecto (0.7) deja cuatro cajas solapadas; el `iou=0.45`
-de la configuración deja las dos correctas, pero en otros frames quedan falsos positivos.
-Los gráficos lo muestran: la matriz de distancias de los ocho equipos con más permanencia no
-tiene ningún par bajo 14 m, pero el mapa muestra puntos en nivel crítico. Esas alertas vienen
-de tracks de vida corta, es decir, de cajas duplicadas. El tracker las reduce, pero
-`video_01` sigue con un mínimo de 0.6 m.
-
-**Las dos fallas tienen la misma causa: el desbalance.** Con 33 bulldozers contra 270 CAEX,
-el modelo aprende mal la clase chica y, ante la duda, apuesta por la grande, lo que sube el
-recall y baja la precisión.
-
-**Aprendió a separar, aunque no a clasificar.** Con 33 ejemplos no alcanzó a aprender la
-clase `bulldozer`, pero entrenar con cajas separadas le enseñó a no juntar máquinas vecinas,
-que era lo que bloqueaba la proximidad.
-
-**Conclusión.** El detector cumple lo que la proximidad necesita: encuentra todos los CAEX y
-separa las máquinas vecinas. No sirve para saber qué tipo de equipo es, y su baja precisión
-genera alertas falsas que el tracker reduce pero no elimina. Hoy las alertas sirven como
-aviso, no como conteo exacto de eventos. Los dos problemas son de datos, no de diseño.
+**Conclusión.** El detector cumple lo que la proximidad necesita: encuentra el 88 % de los
+CAEX y separa las máquinas vecinas. No sirve todavía para decir qué tipo de equipo es. Los
+dos pasos siguientes son de bajo costo y ya están implementados: reentrenar con las
+etiquetas corregidas y elegir un umbral por clase con validación cruzada.
 
 ### 3.2 Altura del pretil
 
-**Mido estabilidad, no exactitud.** Sin el perfil real anotado sé cuánto tiembla la curva,
-pero no cuánto se aleja del pretil verdadero.
+**Ahora mido exactitud, aunque sea en sintético.** El camino óptimo supera al argmax por
+hasta 15 puntos cuando la cresta es visible, y los dos fallan cuando no lo es.
 
-**El Método 1 es más estable en todas las condiciones**, con 44 % menos jitter que el
-Método 2 a 1.44 veces el costo. De noche el Método 2 parecía mejor, pero era porque se
-quedaba pegado al horizonte: al corregir la búsqueda (ADR 0007) su jitter nocturno subió
-90 %, y eso confirmó la hipótesis.
+**En el material el camino óptimo es más estable que el argmax en los cuatro videos**, con
+una métrica que no confunde cobertura con movimiento. La conclusión del ADR 0006 se
+sostiene; la cifra anterior ("44 % menos jitter") no, porque estaba calculada con la métrica
+defectuosa.
 
-**El error por luz es de al menos ±12 %.** Es un piso, porque un error común a todas las
-condiciones, como un ancho nominal equivocado, no aparece en esa variación.
+**La altura absoluta no tiene un valor verdadero contra el cual comparar.** El material es
+generado con IA, así que no hay una geometría métrica real que recuperar. El sesgo de ~4×
+frente a la normativa puede venir del método o de la escena. Lo que sí se puede usar es la
+altura **relativa**: el error de escala es el mismo para todas las mediciones de una toma y
+se cancela.
 
-**El valor absoluto está unas cuatro veces bajo lo esperado.** No ajusté parámetros para
-acercarlo. Tengo tres hipótesis sin resolver: que la base se detecta demasiado arriba en un
-talud suave (la más probable), que la curva sigue el quiebre de la plataforma y no el
-pretil, o que el ancho nominal del CAEX no es el de esta máquina.
-
-**El error de escala se cancela dentro de una toma.** Es el mismo para todas las
-mediciones, así que un cambio relativo, como el pretil bajando respecto de sí mismo, sí es
-confiable.
-
-**Conclusión.** La altura sirve para vigilar si el pretil se degrada respecto de su propia
-línea base, pero no para verificar cumplimiento: el valor absoluto está unas cuatro veces
-bajo lo esperado y varía ±12 % solo por la luz. La curva es estable con el Método 1, pero
-sin ground truth no sé cuán exacta es.
+**Conclusión.** El método del pretil es más defendible que antes: se abstiene cuando no ve
+una cresta, mide exactitud en condiciones controladas y cuesta 3.6 a 4.6 veces menos. Para
+validarlo sobre material real hace falta video real y el perfil anotado en unos 30 frames.
 
 ---
 
 ## 4. Qué queda por hacer
 
-Ordenado por impacto dentro de cada objetivo.
-
 ### Detección y proximidad
 
-1. **Anotar más bulldozers**, extrayendo frames solo de los tramos donde aparece. Unas
-   sesenta anotaciones más, cerca de una hora, duplicarían la clase.
-2. **Copy-paste augmentation** con los 44 bulldozers que ya anoté con polígono: pegar sus
-   recortes en otros frames multiplica la clase sin anotar más, y son del dominio exacto.
-3. **Bajar las falsas alertas desde el tracker**, exigiendo más detecciones antes de
-   confirmar un track, en vez de subir el umbral de confianza, que le quitaría recall al
-   bulldozer. Hay que medir el efecto en las alertas.
-4. **Medir el detector por condición de luz**, que quedó pendiente (ADR 0005).
-5. **Justificar los umbrales de 20 y 10 m** contra la normativa y la distancia de frenado de
-   un CAEX cargado. Hoy son preliminares.
+1. **Reentrenar con las etiquetas auditadas y medir el copy-paste con validación cruzada.**
+   Todo está implementado (`scripts/cross_validate.py --variants base copypaste`); falta
+   correrlo con la GPU libre (ADR 0009).
+2. **Elegir el umbral del bulldozer** con las predicciones fuera de muestra de esa
+   validación cruzada, y activarlo en `configs/`.
+3. **Cerrar los 4 casos pendientes de la auditoría** (`data/auditoria_etiquetas.json`).
+4. **Evaluar las alertas una por una** en un video: cuántas son verdaderas. Es la métrica
+   que le importa a un operador.
+5. **Justificar los umbrales de 20 y 10 m** contra la normativa y la distancia de frenado.
 
 ### Altura del pretil
 
-1. **Anotar el perfil real del pretil** en unos 30 frames estratificados por luz. Permite
-   medir el error de la cresta, elegir entre métodos por exactitud y probar las tres
-   hipótesis del sesgo.
-2. **Calibrar la cámara**, con un tablero de ajedrez o los datos de montaje, para que la
-   escala no dependa de la maquinaria.
-3. **Reportar la altura relativa al radio de rueda** del equipo mayor. Es como la normativa
-   define el criterio, y cancela el error de escala.
-4. **Limitar la búsqueda con la posición típica de los equipos** en vez de la del que está
-   más abajo, para que una caja demasiado grande no la arrastre al primer plano (ADR 0007).
-5. **Un segmentador neural del pretil**, por ejemplo SAM2 guiado por la curva del Método 1,
-   para comparar un enfoque aprendido contra el geométrico.
+1. **Validar con video real**: el sintético mide la formulación, y el material es generado.
+2. **Anotar el perfil del pretil en ~30 frames** reales, para medir exactitud en el dominio.
+3. **Reportar la altura relativa al radio de rueda**, que cancela la escala.
+4. **Un segmentador neural** (SAM2 guiado por el camino óptimo) contra el geométrico, sobre
+   el mismo benchmark sintético y el mismo ground truth.
 
 ### Generales
 
-- **Acelerar el pretil**, llevándolo a GPU o calculándolo a menor resolución. Es la etapa
-  más cara con GPU (36 ms por frame a 720p).
-- **Exportar a ONNX Runtime** y medir la ganancia frente a PyTorch en FP32 y FP16.
-- **Validar los umbrales de luz y de cortes** con videos nuevos, porque hoy están ajustados
-  con cuatro.
-- **Sumar un segundo anotador**, para medir el acuerdo y la incertidumbre de las etiquetas.
-- **Vigilar la deriva en producción**: alertar si la confianza media del detector empieza a
-  caer.
+- **Exportar el detector a ONNX/TensorRT** y medir la ganancia en FP16: con el pretil a
+  media resolución, el detector pasó a ser la etapa más cara.
+- **Un segundo anotador** para medir el acuerdo entre anotadores.

@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "fecha": "2026-10-18",
+  "metricas": {
+    "tiles": [
+      {
+        "v": "0.88",
+        "l": "recall · CAEX en el video no visto"
+      },
+      {
+        "v": "29",
+        "l": "etiquetas corregidas en la auditoría"
+      },
+      {
+        "v": "3.6–4.6×",
+        "l": "más rápido el pretil a media resolución"
+      },
+      {
+        "v": "+15 pts",
+        "l": "exactitud del pretil vs argmax, 6 huellas (sintético)"
+      }
+    ],
+    "resultados": [
+      {
+        "clase": "CAEX",
+        "mAP": 0.668,
+        "recall": 0.882
+      },
+      {
+        "clase": "Bulldozer",
+        "mAP": 0.586,
+        "recall": 0.0
+      }
+    ],
+    "ic95": {
+      "CAEX": [
+        0.4644,
+        0.8883
+      ],
+      "Bulldozer": [
+        0.2686,
+        0.9649
+      ]
+    },
+    "umbral_operacion": 0.25
+  }
+}

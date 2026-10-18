@@ -6,6 +6,7 @@
       "cobertura": 0.6529749586092717,
       "sin_pretil": 0.0,
       "alertas": 39,
+      "etapa_pretil_ms": 109.98936821066694,
       "altura_mediana_por_luz": {
         "day": 0.418,
         "dusk": 0.422,
@@ -19,6 +20,7 @@
       "cobertura": 0.6789200469094919,
       "sin_pretil": 0.0,
       "alertas": 39,
+      "etapa_pretil_ms": 86.05788344350051,
       "altura_mediana_por_luz": {
         "day": 0.415,
         "dusk": 0.446,
@@ -32,6 +34,7 @@
       "cobertura": 0.4978466386554622,
       "sin_pretil": 0.008333333333333333,
       "alertas": 12,
+      "etapa_pretil_ms": 49.56946166785201,
       "altura_mediana_por_luz": {
         "day": 0.281,
         "dusk": 0.325,
@@ -45,6 +48,7 @@
       "cobertura": 0.4997603728991599,
       "sin_pretil": 0.008333333333333333,
       "alertas": 12,
+      "etapa_pretil_ms": 35.85469708268647,
       "altura_mediana_por_luz": {
         "day": 0.276,
         "dusk": 0.335,
@@ -58,6 +62,7 @@
       "cobertura": 0.4457779947916666,
       "sin_pretil": 0.0,
       "alertas": 16,
+      "etapa_pretil_ms": 55.374075414874824,
       "altura_mediana_por_luz": {
         "day": 0.31,
         "dusk": 0.306,
@@ -71,6 +76,7 @@
       "cobertura": 0.4531087239583334,
       "sin_pretil": 0.0,
       "alertas": 16,
+      "etapa_pretil_ms": 36.55084083099306,
       "altura_mediana_por_luz": {
         "day": 0.312,
         "dusk": 0.304,
@@ -84,6 +90,7 @@
       "cobertura": 0.5427897135416665,
       "sin_pretil": 0.0,
       "alertas": 13,
+      "etapa_pretil_ms": 62.34457791676201,
       "altura_mediana_por_luz": {
         "day": 0.386,
         "dusk": 0.328,
@@ -97,6 +104,7 @@
       "cobertura": 0.5455078125,
       "sin_pretil": 0.0,
       "alertas": 13,
+      "etapa_pretil_ms": 36.83487499996166,
       "altura_mediana_por_luz": {
         "day": 0.369,
         "dusk": 0.326,
@@ -112,6 +120,7 @@
       "cobertura": 0.6852338576158945,
       "sin_pretil": 0.0,
       "alertas": 39,
+      "etapa_pretil_ms": 29.00028907476511,
       "altura_mediana_por_luz": {
         "day": 0.43,
         "dusk": 0.451,
@@ -125,6 +134,7 @@
       "cobertura": 0.6627862858719645,
       "sin_pretil": 0.0,
       "alertas": 39,
+      "etapa_pretil_ms": 18.39923642137063,
       "altura_mediana_por_luz": {
         "day": 0.436,
         "dusk": 0.461,
@@ -138,6 +148,7 @@
       "cobertura": 0.5162421218487397,
       "sin_pretil": 0.008333333333333333,
       "alertas": 12,
+      "etapa_pretil_ms": 13.708959582193833,
       "altura_mediana_por_luz": {
         "day": 0.298,
         "dusk": 0.346,
@@ -151,6 +162,7 @@
       "cobertura": 0.5060990021008405,
       "sin_pretil": 0.008333333333333333,
       "alertas": 12,
+      "etapa_pretil_ms": 10.373721668778066,
       "altura_mediana_por_luz": {
         "day": 0.299,
         "dusk": 0.349,
@@ -164,6 +176,7 @@
       "cobertura": 0.4923437499999998,
       "sin_pretil": 0.0,
       "alertas": 16,
+      "etapa_pretil_ms": 15.067881665405972,
       "altura_mediana_por_luz": {
         "day": 0.325,
         "dusk": 0.321,
@@ -177,6 +190,7 @@
       "cobertura": 0.4802473958333335,
       "sin_pretil": 0.0,
       "alertas": 16,
+      "etapa_pretil_ms": 10.551459165920582,
       "altura_mediana_por_luz": {
         "day": 0.327,
         "dusk": 0.324,
@@ -190,6 +204,7 @@
       "cobertura": 0.5571875,
       "sin_pretil": 0.0,
       "alertas": 13,
+      "etapa_pretil_ms": 13.410215832360942,
       "altura_mediana_por_luz": {
         "day": 0.4,
         "dusk": 0.346,
@@ -203,6 +218,7 @@
       "cobertura": 0.5422786458333333,
       "sin_pretil": 0.0,
       "alertas": 13,
+      "etapa_pretil_ms": 10.214648753026268,
       "altura_mediana_por_luz": {
         "day": 0.383,
         "dusk": 0.348,

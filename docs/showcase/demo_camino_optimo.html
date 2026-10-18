@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Camino óptimo vs argmax</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<style>
+  :root{--bg:#c0c0c0;--ink:#101010}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Tahoma,Verdana,sans-serif}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  h1{font-size:18px;margin:0 0 4px}
+  p{margin:6px 0 12px;max-width:62ch}
+</style>
+</head>
+<body>
+<main>
+  <h1>BermGuard · camino óptimo vs argmax</h1>
+  <p>La cresta del pretil es un escalón de poco contraste, y las huellas de neumático del primer plano dan más gradiente que ella.
+     El argmax elige cada columna por separado y salta a las huellas; el camino óptimo exige que la cresta sea continua mientras la busca.
+     Sube las huellas o baja el contraste hasta que los dos fallen.</p>
+  <div id="demo"></div>
+</main>
+<script src="berm-demo.js"></script>
+<script>BermDemo.mount(document.getElementById('demo'));</script>
+</body>
+</html>

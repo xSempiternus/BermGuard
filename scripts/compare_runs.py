@@ -36,6 +36,7 @@ def leer(raiz: Path) -> dict[str, dict[str, object]]:
             "cobertura": datos.get("berm_coverage_mean"),
             "sin_pretil": datos.get("berm_dropout_rate"),
             "alertas": datos.get("proximity_alerts"),
+            "etapa_pretil_ms": datos.get("timing", {}).get("stage_ms", {}).get("berm"),
             "altura_mediana_por_luz": {
                 k: round(float(np.median(v)), 3) for k, v in sorted(por_luz.items())
             },

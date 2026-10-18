@@ -4,6 +4,25 @@ Comparación de los métodos sobre el material de muestra: 4 videos, 1.022 frame
 resoluciones y luminancia media entre 19 y 163 (de noche cerrada a pleno día). Todas las
 cifras se pueden reproducir con los comandos indicados.
 
+> **Revisión de octubre de 2026.** Una segunda pasada sobre la metodología cambió cinco
+> conclusiones de este reporte. Las secciones afectadas están corregidas en su lugar y
+> marcadas con *(revisado)*:
+>
+> 1. **Detector.** La precisión y el recall eran los del umbral de máximo F1, no los del
+>    umbral de operación, y 29 bulldozers estaban etiquetados como CAEX. En el punto de
+>    operación y con etiquetas auditadas, el CAEX tiene precisión 0.53 y recall 0.88, y el
+>    bulldozer AP 0.59 pero recall 0 al umbral 0.25 (ADR 0009).
+> 2. **Pretil.** La validación aceptaba ruido puro (83 % de cobertura sobre una banda sin
+>    pretil) y el jitter mezclaba cambios de cobertura con movimiento. Con ambos
+>    corregidos, el camino óptimo sigue siendo más estable que el argmax en los cuatro
+>    videos, y por primera vez se mide exactitud, sobre escenas sintéticas (ADR 0008).
+> 3. **Costo.** El pretil se segmenta a media resolución: entre 3.6 y 4.6 veces más rápido
+>    y deja de ser el cuello de botella (ADR 0010).
+> 4. **Material.** Los videos son generados con IA. La altura absoluta no tiene un valor
+>    verdadero contra el cual comparar (`docs/analisis_material.md`, sección 6).
+> 5. **Ingeniería.** `mypy --strict` no pasaba como decía el README; ahora pasa, con 64
+>    tests y CI.
+
 ---
 
 ## 0. Los dos métodos corren sobre los cuatro videos
@@ -32,8 +51,8 @@ Ejemplo del `metadata.json` de `video_02`:
 | Campo | `method_1` | `method_2` |
 |---|---|---|
 | `method_name` | Prior geométrico | Línea base por argmax |
-| `berm_crest_jitter_px` | **9.94** | 17.46 |
-| `average_fps` | 12.7 | **17.2** |
+| `berm_crest_jitter_col_px` *(revisado)* | **0.60** | 0.63 |
+| `berm_coverage_mean` *(revisado)* | 0.52 | 0.51 |
 | `proximity_alerts` | 12 | 12 |
 
 Las alertas coinciden porque la proximidad no depende de cómo se segmenta el terreno. En
@@ -68,13 +87,16 @@ diferencia medida se puede atribuir a esa única decisión.
 |---|---|---|
 | mAP@0.5 por clase | Calidad de detección | Para alertar importa encontrar el equipo, no ajustar la caja al píxel. Por clase, porque con un desbalance de 7:1 el promedio lo domina la clase grande |
 | Precisión y recall | Cada tipo de error | Un equipo no detectado es un riesgo; un falso positivo es una falsa alarma. El mAP no los separa |
-| Jitter de la cresta (px) | Estabilidad del perfil en el tiempo | El enunciado penaliza el parpadeo, y es la única medida de calidad del pretil que tengo sin ground truth |
+| Jitter de la cresta por columna (px) *(revisado)* | Estabilidad del perfil en el tiempo | El enunciado penaliza el parpadeo. Compara columna a columna solo lo medido en ambos frames (ADR 0008) |
+| Exactitud en escenas sintéticas *(nuevo)* | Fracción de columnas a ≤5 px de una cresta conocida | Es la única medida de exactitud posible sin ground truth del material |
 | ms/frame y p95 | Costo | El p95, porque un video se percibe por sus peores frames |
 | ms por etapa | Dónde está el cuello de botella | Un FPS total no dice qué optimizar |
 | Dispersión de la altura entre condiciones de luz | Error de la altura | Ver sección 6 |
 
-El jitter es la desviación estándar del cambio de la cresta entre frames consecutivos,
-dentro de cada toma.
+El jitter anterior era la desviación estándar del cambio de la **mediana** de la cresta
+entre frames consecutivos. Esa mediana se mueve cuando cambia qué columnas son válidas,
+aunque el pretil esté quieto, así que la métrica principal pasó a ser el jitter por
+columna. Las tablas de la sección 4.2 conservan la métrica anterior y lo indican.
 
 La **cobertura** del pretil estaba planeada como métrica y la descarté después de medirla
 (sección 4.3).
@@ -142,18 +164,24 @@ ocre, con polvo y a media distancia.
 131 frames de entrenamiento anotados a mano y 40 de validación (`video_04` completo),
 separados por video y no al azar. Detalle en `docs/resultados.md`.
 
-| Clase | Instancias (train) | mAP@0.5 | mAP@0.5:0.95 | Precisión | Recall |
-|---|---|---|---|---|---|
-| `caex` | 270 | **0.812** | 0.585 | 0.297 | **1.000** |
-| `bulldozer` | 33 | **0.306** | 0.188 | 0.464 | 0.455 |
-| global | | 0.559 | 0.387 | 0.381 | 0.727 |
+*(revisado)* En el punto de operación (confianza 0.25, NMS 0.45), con etiquetas auditadas e
+intervalo de confianza del 95 % por bootstrap de bloques:
+
+| Clase | Instancias (train) | AP@0.5 | Precisión | Recall |
+|---|---|---|---|---|
+| `caex` | 246 | **0.668** [0.46–0.89] | 0.526 | **0.882** |
+| `bulldozer` | 57 | **0.586** [0.27–0.96] | — | 0.000 |
+
+La versión anterior de esta tabla (`caex` 0.812 / P 0.297 / R 1.000, `bulldozer` 0.306)
+tenía las etiquetas sin auditar y P y R en el umbral de máximo F1 de Ultralytics. El
+detalle está en el ADR 0009 y en `docs/resultados.md`, sección 1.3.
 
 ### 3.4 Resultado
 
 | | COCO | Zero-shot | Fine-tuned |
 |---|---|---|---|
 | Separa CAEX y bulldozer | No | No | **Sí** |
-| Clasifica bien el bulldozer | No | No | Débil (0.306) |
+| Clasifica bien el bulldozer | No | No | AP 0.59, pero recall 0 al umbral 0.25 *(revisado)* |
 | Datos anotados | 0 | 0 | 171 frames (~2 h) |
 
 El fine-tuning resolvió lo que bloqueaba el pipeline, aunque no la clasificación. La
@@ -199,17 +227,25 @@ gruesa, exclusión de las cajas de maquinaria, la misma banda de búsqueda (el m
 
 ### 4.1 Resultados
 
-| | Método 1 (camino óptimo) | Método 2 (argmax + filtro) |
-|---|---|---|
-| **Jitter de la cresta** | **14.57 px** | 26.17 px |
-| Cobertura media | 89.3 % | 86.5 % |
-| Costo de la etapa | 55.0 ms/frame | **38.1 ms/frame** |
-| Pipeline completo | 10.7 fps | **13.9 fps** |
-| ms/frame (p95) | 117.7 | 97.8 |
-| Altura mediana | 0.38 m | 0.37 m |
+*(revisado)* Con la validación contra el ruido real, el jitter por columna y media
+resolución (ADR 0008 y 0010), en la misma sesión:
 
-**El Método 1 tiene 44 % menos jitter y cuesta 1.44 veces más.** La búsqueda global es más
-cara, pero da un perfil que no puede saltar.
+| Video | Jitter M1 | Jitter M2 | Etapa M1 | Etapa M2 |
+|---|---|---|---|---|
+| `video_01` (1080p) | **5.71 px** | 6.75 px | 29.0 ms | 18.4 ms |
+| `video_02` | **0.60 px** | 0.63 px | 13.7 ms | 10.4 ms |
+| `video_03` | **0.95 px** | 1.51 px | 15.1 ms | 10.6 ms |
+| `video_04` | **2.14 px** | 2.91 px | 13.4 ms | 10.2 ms |
+
+| | Método 1 | Método 2 |
+|---|---|---|
+| Altura mediana | 0.41 m | 0.40 m |
+| Cobertura media | 0.49–0.69 | 0.48–0.66 |
+
+**El Método 1 es más estable en los cuatro videos (1.05 a 1.6 veces) y cuesta 1.3 a 1.6
+veces más.** La versión anterior decía "44 % menos jitter": esa cifra salía de la métrica
+por mediana, que confunde cobertura con movimiento, y de una validación que aceptaba ruido.
+La dirección de la conclusión se mantiene; la magnitud era más grande de lo que es.
 
 Los tiempos de ambos métodos salen de la misma corrida, en el host y sin otros procesos
 usando la GPU, así que son comparables entre sí. No los comparo con corridas de otras
@@ -219,6 +255,10 @@ La altura mediana es casi igual porque ambos usan el mismo estimador; lo que cam
 cuánto oscila.
 
 ### 4.2 Por condición de luz
+
+*Medido con la métrica de jitter anterior y antes del ADR 0008. Se conserva porque el
+experimento de la inversión nocturna sigue siendo válido como experimento controlado: el
+cambio que lo prueba (ADR 0007) es independiente de cómo se mida el jitter.*
 
 | Condición | Jitter M1 (px) | Jitter M2 (px) | Frames |
 |---|---|---|---|
@@ -260,7 +300,12 @@ El arreglo dejó dos defectos a la vista, descritos en el ADR 0007:
 Es un recordatorio de que menos jitter significa un perfil más estable, no uno más
 correcto.
 
-### 4.3 La cobertura no sirve como métrica
+### 4.3 La cobertura no servía como métrica *(resuelto en el ADR 0008)*
+
+La causa resultó ser mecánica: el suelo de ruido era la mediana de un gradiente rectificado,
+que vale cero, y el corte caía al 5 % del pico. Con la mediana de la respuesta positiva, una
+banda sin pretil da 0 % de cobertura y la cobertura sobre el material baja a 0.5–0.7, con
+diferencias entre videos. El texto que sigue describe la situación anterior.
 
 La cobertura es el porcentaje de columnas donde el perfil se considera válido. Probé dos
 criterios de validación:
@@ -281,6 +326,11 @@ noche), lo esperable al achicar la banda.
 ---
 
 ## 5. Despliegue: CPU contra CUDA
+
+*Medido antes del ADR 0010, con el pretil a resolución completa. Después del cambio el
+pretil cuesta entre 3.6 y 4.6 veces menos y deja de ser la etapa más cara con GPU; la
+conclusión de esta sección (optimizar el pretil antes que el detector) es la que llevó a
+ese cambio. Falta volver a medir dentro del contenedor.*
 
 Medido dentro del contenedor, con el comando de referencia y la imagen construida desde este
 código. La fila de 720p junta los tres videos de esa resolución (entre paréntesis, el rango
@@ -326,6 +376,10 @@ Notas sobre la medición:
 ---
 
 ## 6. Rigor de la medición métrica
+
+*El material es generado con IA (`docs/analisis_material.md`, sección 6). La escena no tiene
+una geometría métrica real, así que lo que sigue describe la consistencia interna del
+método y no su exactitud contra el terreno.*
 
 La altura se calcula sin calibrar la cámara (`bermguard/analytics/height.py`). La fórmula
 tiene una ventaja: la focal se cancela.

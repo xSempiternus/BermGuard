@@ -78,7 +78,7 @@ verdadera (`docs/experimentos/pretil_sintetico.json`):
 | 8 | 6 | 17 % | 21 % |
 
 El camino óptimo gana cuando la cresta es visible: con contraste alto la ventaja crece con
-las huellas, hasta 11–15 puntos. Cuando la cresta es más débil que los distractores no gana
+las huellas, hasta 15 puntos. Cuando la cresta es más débil que los distractores no gana
 ninguno, y el camino óptimo puede quedar algo peor, porque si se engancha a una huella larga
 la sigue entera. La continuidad ayuda a no saltar a una huella corta, no a encontrar una
 cresta que no se ve.
