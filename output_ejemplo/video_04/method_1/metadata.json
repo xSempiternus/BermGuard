@@ -18,21 +18,21 @@
     ]
   },
   "timing": {
-    "average_fps": 11.174531387995819,
-    "ms_per_frame": 86.38185458348744,
-    "ms_per_frame_p95": 120.28449999343138,
+    "average_fps": 15.304437301609433,
+    "ms_per_frame": 62.751159166024685,
+    "ms_per_frame_p95": 68.94019996980205,
     "stage_ms": {
-      "berm": 46.352118332894555,
-      "detect": 18.986272916602804,
-      "height": 0.3063274998567067,
-      "lighting": 7.978067500213608,
-      "preprocess": 0.0037854164474993013,
-      "proximity": 0.12039583355848056,
-      "render": 4.359819999323615,
-      "shot": 1.4415162499062717,
-      "track": 0.11462999973446131
+      "berm": 13.410215832360942,
+      "detect": 30.72279458574485,
+      "height": 0.23511583591850163,
+      "lighting": 6.908227917786765,
+      "preprocess": 0.003693332109833136,
+      "proximity": 0.12347292237488243,
+      "render": 3.1570108335775635,
+      "shot": 1.565603748895228,
+      "track": 0.09022083419646758
     },
-    "total_seconds": 21.477410699997563
+    "total_seconds": 15.681726499984507
   },
   "proximity_alerts": 13,
   "shots_detected": 1,
@@ -41,9 +41,10 @@
     "dusk": 0.09583333333333334,
     "night": 0.5666666666666667
   },
-  "berm_coverage_mean": 0.8991666666666663,
+  "berm_coverage_mean": 0.5571875,
   "berm_dropout_rate": 0.0,
-  "berm_crest_jitter_px": 13.247,
+  "berm_crest_jitter_px": 20.829,
+  "berm_crest_jitter_col_px": 2.141,
   "runtime": {
     "device": "cuda",
     "torch_version": "2.6.0+cu124",
@@ -51,6 +52,6 @@
     "gpu_name": "NVIDIA GeForce RTX 3050 Ti Laptop GPU",
     "cuda_version": "12.4"
   },
-  "code_version": "6a2d5ba",
+  "code_version": "99f9163",
   "warnings": []
 }
