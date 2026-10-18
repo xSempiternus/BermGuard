@@ -70,8 +70,15 @@ def _a_escala_completa(serie: FloatArray, ancho: int, factor: float) -> FloatArr
     """Reescala filas y columnas. Una columna sin medición sigue sin medición."""
     x_chico = (np.arange(serie.size, dtype=np.float64) + 0.5) * factor - 0.5
     x = np.arange(ancho, dtype=np.float64)
-    valores = np.interp(x, x_chico, np.nan_to_num(serie, nan=0.0)) * factor
+    medidas = np.isfinite(serie)
+    if not medidas.any():
+        return np.full(ancho, np.nan, dtype=np.float32)
+    # Se interpola sólo entre columnas medidas. Rellenar los huecos con cero y luego
+    # interpolar dejaba las columnas vecinas a un hueco a mitad de camino hacia la fila
+    # 0, y el OSD las dibujaba como espigas verticales.
+    valores = np.interp(x, x_chico[medidas], serie[medidas].astype(np.float64)) * factor
     # Huecos: el vecino más cercano a escala reducida decide si hay medición.
     vecino = np.clip(np.round((x + 0.5) / factor - 0.5).astype(int), 0, serie.size - 1)
     valores[~np.isfinite(serie[vecino])] = np.nan
-    return valores.astype(np.float32)
+    salida: FloatArray = valores.astype(np.float32)
+    return salida

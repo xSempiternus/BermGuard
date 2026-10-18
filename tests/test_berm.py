@@ -160,3 +160,14 @@ class TestMediaResolucion:
         b = ScaledBermSegmenter(ClassicalBermSegmenter(), 1.0).segment(escena.image)
         assert a is not None and b is not None
         np.testing.assert_array_equal(a.crest_y_px, b.crest_y_px)
+
+    def test_reescalar_no_inventa_valores_junto_a_los_huecos(self):
+        from bermguard.vision.berm.scaled import _a_escala_completa
+
+        serie = np.array([500, 500, np.nan, np.nan, 510, 510], dtype=np.float32)
+        completa = _a_escala_completa(serie, 12, 2.0)
+        medidos = completa[np.isfinite(completa)]
+        # Cada columna medida debe quedar entre los valores reales (x2), nunca a mitad de
+        # camino hacia cero, que es lo que dibujaba espigas verticales en el OSD.
+        assert medidos.min() >= 1000 - 1e-3
+        assert medidos.max() <= 1020 + 1e-3

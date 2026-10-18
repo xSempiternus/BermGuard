@@ -107,86 +107,86 @@
   },
   "despues": {
     "video_01/method_1": {
-      "jitter_mediana_px": 39.002,
-      "jitter_columna_px": 5.962,
+      "jitter_mediana_px": 38.458,
+      "jitter_columna_px": 5.715,
       "cobertura": 0.6852338576158945,
       "sin_pretil": 0.0,
       "alertas": 39,
       "altura_mediana_por_luz": {
         "day": 0.43,
-        "dusk": 0.446,
-        "night": 0.622
+        "dusk": 0.451,
+        "night": 0.635
       },
       "frames_con_altura": 296
     },
     "video_01/method_2": {
-      "jitter_mediana_px": 49.361,
-      "jitter_columna_px": 7.149,
+      "jitter_mediana_px": 50.566,
+      "jitter_columna_px": 6.747,
       "cobertura": 0.6627862858719645,
       "sin_pretil": 0.0,
       "alertas": 39,
       "altura_mediana_por_luz": {
         "day": 0.436,
-        "dusk": 0.46,
-        "night": 0.558
+        "dusk": 0.461,
+        "night": 0.555
       },
       "frames_con_altura": 296
     },
     "video_02/method_1": {
-      "jitter_mediana_px": 14.415,
-      "jitter_columna_px": 0.63,
+      "jitter_mediana_px": 14.191,
+      "jitter_columna_px": 0.6,
       "cobertura": 0.5162421218487397,
       "sin_pretil": 0.008333333333333333,
       "alertas": 12,
       "altura_mediana_por_luz": {
         "day": 0.298,
-        "dusk": 0.347,
-        "night": 0.416
+        "dusk": 0.346,
+        "night": 0.415
       },
       "frames_con_altura": 238
     },
     "video_02/method_2": {
-      "jitter_mediana_px": 14.318,
-      "jitter_columna_px": 0.638,
+      "jitter_mediana_px": 14.687,
+      "jitter_columna_px": 0.632,
       "cobertura": 0.5060990021008405,
       "sin_pretil": 0.008333333333333333,
       "alertas": 12,
       "altura_mediana_por_luz": {
-        "day": 0.298,
-        "dusk": 0.35,
-        "night": 0.401
+        "day": 0.299,
+        "dusk": 0.349,
+        "night": 0.4
       },
       "frames_con_altura": 238
     },
     "video_03/method_1": {
-      "jitter_mediana_px": 13.193,
-      "jitter_columna_px": 0.983,
+      "jitter_mediana_px": 12.772,
+      "jitter_columna_px": 0.955,
       "cobertura": 0.4923437499999998,
       "sin_pretil": 0.0,
       "alertas": 16,
       "altura_mediana_por_luz": {
-        "day": 0.324,
-        "dusk": 0.322,
-        "night": 0.449
+        "day": 0.325,
+        "dusk": 0.321,
+        "night": 0.446
       },
       "frames_con_altura": 240
     },
     "video_03/method_2": {
-      "jitter_mediana_px": 16.102,
-      "jitter_columna_px": 1.553,
+      "jitter_mediana_px": 14.747,
+      "jitter_columna_px": 1.512,
       "cobertura": 0.4802473958333335,
       "sin_pretil": 0.0,
       "alertas": 16,
       "altura_mediana_por_luz": {
         "day": 0.327,
         "dusk": 0.324,
-        "night": 0.435
+        "night": 0.431
       },
       "frames_con_altura": 240
     },
     "video_04/method_1": {
-      "jitter_mediana_px": 20.431,
-      "jitter_columna_px": 2.236,
+      "jitter_mediana_px": 20.829,
+      "jitter_columna_px": 2.141,
       "cobertura": 0.5571875,
       "sin_pretil": 0.0,
       "alertas": 13,
@@ -198,8 +198,8 @@
       "frames_con_altura": 240
     },
     "video_04/method_2": {
-      "jitter_mediana_px": 23.442,
-      "jitter_columna_px": 2.978,
+      "jitter_mediana_px": 23.302,
+      "jitter_columna_px": 2.913,
       "cobertura": 0.5422786458333333,
       "sin_pretil": 0.0,
       "alertas": 13,
