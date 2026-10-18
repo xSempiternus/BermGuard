@@ -62,11 +62,11 @@ con datos públicos y afinar con los frames propios. Revisé la vista previa de 
 
 | Dataset | Clases útiles | Imágenes | Vista | Parecido con este material |
 |---|---|---|---|---|
-| `ccl-kl4nk/dji_65` (Roboflow, CC0) | `dozer`, `tippertruck` | 136 | Dron **oblicuo** sobre una mina a cielo abierto, con polvo | El más cercano en geometría y escena. Pocas imágenes y objetos chicos; tolvas de carretera, no CAEX |
-| `mohamads-workspace-rl4ui/bulldozer-lpoe2` (CC BY 4.0) | `Bull_dozer` | 1.324 | Fotos de catálogo | Aporta la forma del bulldozer, no la escena |
-| `minitruck/mining-truck-v1.4` | `mining-truck` | 430 | Cámara fija a nivel del suelo, CAEX en primer plano | Sólo CAEX y a otra escala |
-| `igensol/mines-vehicles` | `truck` | 422 | CCTV nocturno con polvo en una mina | Las condiciones nocturnas sí; las máquinas no |
-| mineCareerDB (Mendeley, 2024) | `trucks`, equipos | 203 | Dron a ~400 m | Cenital y sin clase bulldozer |
+| [`ccl-kl4nk/dji_65`](https://universe.roboflow.com/ccl-kl4nk/dji_65) (CC0) | `dozer`, `tippertruck` | 136 | Dron **oblicuo** sobre una mina a cielo abierto, con polvo | El más cercano en geometría y escena. Pocas imágenes y objetos chicos; tolvas de carretera, no CAEX |
+| [`bulldozer-lpoe2`](https://universe.roboflow.com/mohamads-workspace-rl4ui/bulldozer-lpoe2) (CC BY 4.0) | `Bull_dozer` | 1.324 | Fotos de catálogo | Aporta la forma del bulldozer, no la escena |
+| [`minitruck/mining-truck-v1.4`](https://universe.roboflow.com/minitruck/mining-truck-v1.4) | `mining-truck` | 430 | Cámara fija a nivel del suelo, CAEX en primer plano | Sólo CAEX y a otra escala |
+| [`igensol/mines-vehicles`](https://universe.roboflow.com/igensol/mines-vehicles) | `truck` | 422 | CCTV nocturno con polvo en una mina | Las condiciones nocturnas sí; las máquinas no |
+| [mineCareerDB](https://data.mendeley.com/datasets/c5s76mj4bm/5) (Mendeley, 2024) | `trucks`, equipos | 203 | Dron a ~400 m | Cenital y sin clase bulldozer |
 
 Sigue sin existir un dataset con este encuadre, y la conclusión sobre la fuente principal
 no cambia. Pero el preentrenamiento no necesita el mismo dominio: sirve si le enseña al
@@ -81,5 +81,21 @@ empírica, así que queda como una tercera variante de la validación cruzada de
   partida, así que la diferencia con `base` mide el preentrenamiento. Como ninguna imagen
   pública viene de estos videos, no hay fuga entre folds.
 
-La descarga necesita una API key gratuita de Roboflow y queda fuera del repo (`data/externos/`,
-`data/pretrain/`).
+Pasos para correrla, con la GPU libre:
+
+1. En cada página de Roboflow: *Download Dataset* → formato **YOLOv8** → *download zip*
+   (pide una cuenta gratuita). Descomprimir en `data/externos/<nombre>/`.
+2. Revisar `data.yaml` de cada uno y ajustar el mapa de clases si los nombres difieren:
+
+   ```bash
+   python scripts/prepare_pretrain.py        --source data/externos/dji_65 --source data/externos/bulldozer-lpoe2        --map dozer=bulldozer bull_dozer=bulldozer tippertruck=caex
+   ```
+
+   El script imprime, por fuente, cuántas instancias quedaron de cada clase y qué clases
+   descartó; el resumen queda en `data/pretrain/resumen.json`.
+3. `python scripts/cross_validate.py --variants base copypaste pretrain --batch 4`.
+
+Recomiendo empezar sólo con `dji_65` y `bulldozer-lpoe2`: son los que tienen bulldozer, la
+clase que falta. Los de CAEX aportan poco, porque el CAEX ya se detecta bien.
+
+Los datasets descargados quedan fuera del repo (`data/externos/`, `data/pretrain/`).
