@@ -88,11 +88,20 @@ Pasos para correrla, con la GPU libre:
 2. Revisar `data.yaml` de cada uno y ajustar el mapa de clases si los nombres difieren:
 
    ```bash
-   python scripts/prepare_pretrain.py        --source data/externos/dji_65 --source data/externos/bulldozer-lpoe2        --map dozer=bulldozer bull_dozer=bulldozer tippertruck=caex
+   python scripts/prepare_pretrain.py        --source data/externos/dji_65 --source data/externos/bulldozer-lpoe2        --map dozer=bulldozer bull_dozer=bulldozer tippertruck=caex        --require bulldozer
    ```
 
-   El script imprime, por fuente, cuántas instancias quedaron de cada clase y qué clases
-   descartó; el resumen queda en `data/pretrain/resumen.json`.
+   `--require bulldozer` conserva sólo las imágenes con al menos un bulldozer. En `dji_65`
+   muchos frames no tienen dozer (sólo tolvas, vehículos livianos, palas o agua) y no
+   aportan a la clase que falta, así que se descartan. En los frames que quedan, las tolvas
+   siguen etiquetadas como `caex`: sin etiqueta, el modelo aprendería que un camión es
+   fondo. Las demás clases (`lmv`, `shovel`, `stagnant_water`) se descartan como etiqueta y
+   quedan como fondo.
+
+   El script imprime, por fuente, cuántas imágenes quedaron, cuántas se descartaron por no
+   tener bulldozer y cuántas instancias hay de cada clase; el resumen queda en
+   `data/pretrain/resumen.json`. Conviene mirar ese número antes de entrenar: si de
+   `dji_65` quedan muy pocas imágenes, su aporte va a ser chico frente a `bulldozer-lpoe2`.
 3. `python scripts/cross_validate.py --variants base copypaste pretrain --batch 4`.
 
 Recomiendo empezar sólo con `dji_65` y `bulldozer-lpoe2`: son los que tienen bulldozer, la

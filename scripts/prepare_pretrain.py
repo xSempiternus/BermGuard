@@ -12,7 +12,8 @@ modelo preentrenado sirve para los cuatro folds de ``cross_validate.py`` sin fug
 Uso:
     python scripts/prepare_pretrain.py \\
         --source data/externos/dji_65 --source data/externos/bulldozer-lpoe2 \\
-        --map dozer=bulldozer bull_dozer=bulldozer tippertruck=caex dump_truck=caex
+        --map dozer=bulldozer bull_dozer=bulldozer tippertruck=caex \\
+        --require bulldozer
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ import yaml
 
 from bermguard.training.pretrain import (
     CLASES_PROYECTO,
+    contiene,
     normalizar,
     parse_class_map,
     remap_labels,
@@ -51,6 +53,15 @@ def main() -> None:
         action="store_true",
         help="Conservar imágenes sin clases traducidas, como ejemplos de fondo",
     )
+    parser.add_argument(
+        "--require",
+        choices=CLASES_PROYECTO,
+        help=(
+            "Conservar sólo imágenes con al menos una instancia de esta clase. Con "
+            "'bulldozer', de dji_65 quedan sólo los frames con dozer; sus tolvas siguen "
+            "etiquetadas como caex, porque sin etiqueta enseñarían que un camión es fondo"
+        ),
+    )
     args = parser.parse_args()
 
     mapa = parse_class_map(args.map)
@@ -61,7 +72,13 @@ def main() -> None:
     for fuente in args.source:
         nombres = nombres_de(fuente / "data.yaml")
         sin_traducir = sorted(n for n in nombres if normalizar(n) not in mapa)
-        conteo = {"imagenes": 0, "vacias_descartadas": 0, "caex": 0, "bulldozer": 0}
+        conteo = {
+            "imagenes": 0,
+            "vacias_descartadas": 0,
+            "sin_clase_requerida": 0,
+            "caex": 0,
+            "bulldozer": 0,
+        }
         for carpeta, particion in PARTICIONES.items():
             for etiqueta in sorted((fuente / carpeta / "labels").glob("*.txt")):
                 imagenes = list((fuente / carpeta / "images").glob(f"{etiqueta.stem}.*"))
@@ -70,6 +87,9 @@ def main() -> None:
                 texto = remap_labels(etiqueta.read_text(encoding="utf-8"), nombres, mapa)
                 if not texto and not args.keep_empty:
                     conteo["vacias_descartadas"] += 1
+                    continue
+                if args.require and not contiene(texto, args.require):
+                    conteo["sin_clase_requerida"] += 1
                     continue
                 nombre = f"{fuente.name}__{etiqueta.stem}"
                 destino_img = args.out / "images" / particion / f"{nombre}{imagenes[0].suffix}"
@@ -90,7 +110,11 @@ def main() -> None:
         encoding="utf-8",
     )
     (args.out / "resumen.json").write_text(
-        json.dumps({"mapa": args.map, "fuentes": resumen}, indent=2, ensure_ascii=False),
+        json.dumps(
+            {"mapa": args.map, "requiere": args.require, "fuentes": resumen},
+            indent=2,
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
 

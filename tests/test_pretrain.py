@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from bermguard.training.pretrain import parse_class_map, remap_labels
+from bermguard.training.pretrain import contiene, parse_class_map, remap_labels
 
 NOMBRES = ["Bull_dozer", "excavator", "tippertruck"]
 
@@ -28,3 +28,9 @@ def test_reasigna_indices_y_descarta_clases_sin_traduccion():
 def test_imagen_sin_clases_traducidas_queda_vacia():
     mapa = parse_class_map(["tippertruck=caex"])
     assert remap_labels("1 0.5 0.5 0.2 0.2\n9 0.1 0.1 0.1 0.1\n", NOMBRES, mapa) == ""
+
+
+def test_filtro_por_clase_requerida():
+    assert contiene("0 0.5 0.5 0.2 0.2\n1 0.1 0.1 0.1 0.1\n", "bulldozer")
+    assert not contiene("0 0.5 0.5 0.2 0.2\n", "bulldozer")
+    assert not contiene("", "caex")

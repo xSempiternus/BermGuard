@@ -52,3 +52,9 @@ def remap_labels(texto: str, nombres_origen: list[str], mapa: dict[str, int]) ->
         if destino is not None:
             salida.append(" ".join([str(destino), *partes[1:]]))
     return "\n".join(salida) + ("\n" if salida else "")
+
+
+def contiene(texto: str, clase: str) -> bool:
+    """Si un archivo ya remapeado tiene al menos una instancia de ``clase``."""
+    indice = str(CLASES_PROYECTO.index(clase))
+    return any(linea.split()[:1] == [indice] for linea in texto.splitlines())
