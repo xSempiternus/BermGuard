@@ -88,7 +88,8 @@ bulldozer se juntaron desde el navegador en `data/externos/mines/anotaciones_uni
 conservarlo o volver a juntarlo. Con él:
 
 ```bash
-python scripts/import_universe.py data/externos/mines/anotaciones_universe.json     --out data/externos/mines
+python scripts/import_universe.py data/externos/mines/anotaciones_universe.json \
+    --out data/externos/mines
 ```
 
 Descarga las imágenes, les aplica la rotación EXIF a los píxeles y escribe las etiquetas
@@ -97,7 +98,10 @@ YOLO y el `data.yaml`. Resultado: 68 imágenes y 70 dozers.
 ### `data/pretrain/`
 
 ```bash
-python scripts/prepare_pretrain.py     --source data/externos/mines --source data/externos/bulldozer     --map dozer=bulldozer bull_dozer=bulldozer dumper=caex dumb_truck=caex     --require bulldozer --exclude data/pretrain_excluir.txt --repeat mines=5
+python scripts/prepare_pretrain.py \
+    --source data/externos/mines --source data/externos/bulldozer \
+    --map dozer=bulldozer bull_dozer=bulldozer dumper=caex dumb_truck=caex \
+    --require bulldozer --exclude data/pretrain_excluir.txt --repeat mines=5
 ```
 
 Deja 1.068 imágenes de train (245 de Mines, que son 49 repetidas cinco veces) y 300 de
