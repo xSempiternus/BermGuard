@@ -56,6 +56,7 @@ from bermguard.training.copy_paste import (
     parse_polygons,
     paste,
 )
+from bermguard.training.etiquetas import homogeneizar
 
 PATRON = re.compile(r"(video_\d+)_f(\d+)")
 VIDEOS = ("video_01", "video_02", "video_03", "video_04")
@@ -131,7 +132,11 @@ def preparar_fold(
         for imagen, etiqueta in pares:
             nombre = PATRON.search(imagen.stem).group(0)  # type: ignore[union-attr]
             enlazar(imagen, fold / "images" / particion / f"{nombre}.jpg")
-            enlazar(etiqueta, fold / "labels" / particion / f"{nombre}.txt")
+            # Se escribe en vez de enlazar: un archivo que mezcla cajas y polígonos
+            # haría que Ultralytics descarte el frame (bermguard/training/etiquetas.py).
+            destino = fold / "labels" / particion / f"{nombre}.txt"
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            destino.write_text(homogeneizar(etiqueta.read_text(encoding="utf-8")), encoding="utf-8")
             conteo[particion] += 1
             if particion == "train":
                 entrenamiento.append((imagen, etiqueta))

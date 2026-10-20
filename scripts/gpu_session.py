@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 VARIANTES = ("base", "copypaste", "pretrain")
 VRAM_MINIMA_MB = 2800  # con batch 4 el entrenamiento usa ~2.5 GB
+DISCO_MINIMO_GB = 5  # 13 entrenamientos con checkpoints de 20-80 MB, más los folds
 PROCESOS_PESADOS = ("blender", "rocketleague", "valorant", "obs64")
 
 
@@ -70,6 +72,12 @@ def chequear(args: argparse.Namespace) -> list[str]:
                 "data/pretrain se generó sin --exclude o sin --repeat: regenerar con el "
                 "comando del ADR 0004"
             )
+
+    disco_gb = shutil.disk_usage(".").free / 1e9
+    print(f"disco libre: {disco_gb:.1f} GB")
+    if disco_gb < DISCO_MINIMO_GB:
+        # Una prueba de humo ya murió con 'No space left' al guardar un checkpoint.
+        problemas.append(f"disco libre {disco_gb:.1f} GB < {DISCO_MINIMO_GB} GB")
 
     try:
         libre, procesos = vram_libre_mb()
