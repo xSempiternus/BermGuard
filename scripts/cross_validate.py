@@ -242,11 +242,6 @@ def main() -> None:
         help="Pesos COCO de partida; la copia local evita depender de la red",
     )
     parser.add_argument(
-        "--base-model",
-        default="weights/yolo11s.pt",
-        help="Pesos COCO de partida; la copia local evita depender de la red",
-    )
-    parser.add_argument(
         "--weights-root",
         type=Path,
         default=Path("weights"),
