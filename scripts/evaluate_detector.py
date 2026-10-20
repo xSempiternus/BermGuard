@@ -26,6 +26,7 @@ import numpy as np
 from bermguard.benchmark.detection import (
     Box,
     ImageEval,
+    ap_50_95,
     bootstrap_ci,
     class_metrics,
     read_yolo_labels,
@@ -35,6 +36,9 @@ from bermguard.vision.lighting import LightingThresholds, classify_luma
 
 NOMBRES = {0: "caex", 1: "bulldozer"}
 PATRON = re.compile(r"(video_\d+)_f(\d+)")
+# 0.01-0.04 además de la grilla de 0.05: las confianzas del bulldozer quedaron bajo 0.1
+# en detector_v1, y con el borde en 0.05 el umbral elegido fuera de fold se pegaría a él.
+UMBRALES_BARRIDO = [0.01, 0.02, 0.03, 0.04, *np.round(np.arange(0.05, 0.96, 0.05), 2)]
 
 
 def etiqueta_de(imagen: Path, etiquetas: Path) -> Path:
@@ -104,6 +108,8 @@ def resumir(
         ic = bootstrap_ci(imagenes, cls, umbral, replicas=replicas)
         reporte[nombre] = {
             **{k: round(v, 4) for k, v in puntual.items()},
+            # Sin intervalo: diez AP por réplica multiplicarían por diez el bootstrap.
+            "ap50_95": round(ap_50_95(imagenes, cls), 4),
             "ic95": {k: [round(a, 4), round(b, 4)] for k, (a, b) in ic.items()},
         }
     return reporte
@@ -140,7 +146,7 @@ def main() -> None:
         "nms_iou": args.iou,
         "por_clase": resumir(imagenes, args.conf, args.replicas, por_clase),
         "barrido": {
-            nombre: threshold_sweep(imagenes, cls, np.round(np.arange(0.05, 0.96, 0.05), 2))
+            nombre: threshold_sweep(imagenes, cls, UMBRALES_BARRIDO)
             for cls, nombre in NOMBRES.items()
         },
         "por_luz": {},

@@ -89,7 +89,9 @@ def iou(a: Box, b: Box) -> float:
     return inter / union if union > 0 else 0.0
 
 
-def _emparejar(imagen: ImageEval, cls: int) -> tuple[list[tuple[float, bool]], int]:
+def _emparejar(
+    imagen: ImageEval, cls: int, iou_threshold: float = UMBRAL_IOU
+) -> tuple[list[tuple[float, bool]], int]:
     """Marca cada predicción de la clase como acierto o falso positivo.
 
     Returns:
@@ -107,19 +109,30 @@ def _emparejar(imagen: ImageEval, cls: int) -> tuple[list[tuple[float, bool]], i
             valor = iou(pred, caja)
             if valor > mejor:
                 mejor, indice = valor, j
-        acierto = mejor >= UMBRAL_IOU
+        acierto = mejor >= iou_threshold
         if acierto:
             usadas[indice] = True
         marcas.append((pred.conf, acierto))
     return marcas, len(verdad)
 
 
-def class_metrics(images: Sequence[ImageEval], cls: int, operating_conf: float) -> dict[str, float]:
-    """AP@0.5 de una clase y precisión, recall y F1 en el umbral de operación."""
+def class_metrics(
+    images: Sequence[ImageEval],
+    cls: int,
+    operating_conf: float,
+    iou_threshold: float = UMBRAL_IOU,
+) -> dict[str, float]:
+    """AP de una clase y precisión, recall y F1 en el umbral de operación.
+
+    La clave ``ap50`` es el AP al IoU ``iou_threshold`` (0.5 por defecto, de ahí el
+    nombre). ``tp`` y ``fp`` son los conteos en el umbral de operación: permiten sumar
+    varios conjuntos (folds) antes de calcular la precisión, en vez de promediar
+    proporciones de tamaños distintos.
+    """
     marcas: list[tuple[float, bool]] = []
     total = 0
     for imagen in images:
-        m, n = _emparejar(imagen, cls)
+        m, n = _emparejar(imagen, cls, iou_threshold)
         marcas.extend(m)
         total += n
     if total == 0:
@@ -129,6 +142,8 @@ def class_metrics(images: Sequence[ImageEval], cls: int, operating_conf: float) 
             "recall": float("nan"),
             "f1": float("nan"),
             "n_truth": 0.0,
+            "tp": 0.0,
+            "fp": float(sum(c >= operating_conf for c, _ in marcas)),
         }
 
     marcas.sort(key=lambda t: -t[0])
@@ -154,13 +169,34 @@ def class_metrics(images: Sequence[ImageEval], cls: int, operating_conf: float) 
     p_op = tp_op / (tp_op + fp_op) if (tp_op + fp_op) > 0 else float("nan")
     r_op = tp_op / total
     f1 = 2 * p_op * r_op / (p_op + r_op) if p_op == p_op and (p_op + r_op) > 0 else 0.0
-    return {"ap50": ap, "precision": p_op, "recall": r_op, "f1": f1, "n_truth": float(total)}
+    return {
+        "ap50": ap,
+        "precision": p_op,
+        "recall": r_op,
+        "f1": f1,
+        "n_truth": float(total),
+        "tp": tp_op,
+        "fp": fp_op,
+    }
+
+
+def ap_50_95(images: Sequence[ImageEval], cls: int) -> float:
+    """AP promedio sobre IoU 0.50, 0.55, ..., 0.95, como el mAP@0.5:0.95 de COCO."""
+    valores = [
+        class_metrics(images, cls, 1.0, iou_threshold=float(t))["ap50"]
+        for t in np.round(np.arange(0.5, 0.96, 0.05), 2)
+    ]
+    return float(np.mean(valores))
 
 
 def threshold_sweep(
     images: Sequence[ImageEval], cls: int, thresholds: Sequence[float]
 ) -> list[dict[str, float]]:
-    """Precisión, recall y F1 de una clase para cada umbral de confianza."""
+    """Precisión, recall y F1 de una clase para cada umbral de confianza.
+
+    Cada fila lleva además ``tp``, ``fp`` y ``n_truth``, para poder agregar barridos de
+    varios folds sumando conteos (``bermguard.benchmark.lovo``).
+    """
     filas = []
     for umbral in thresholds:
         m = class_metrics(images, cls, umbral)
@@ -170,6 +206,9 @@ def threshold_sweep(
                 "precision": m["precision"],
                 "recall": m["recall"],
                 "f1": m["f1"],
+                "tp": m["tp"],
+                "fp": m["fp"],
+                "n_truth": m["n_truth"],
             }
         )
     return filas

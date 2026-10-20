@@ -65,3 +65,14 @@ def test_lee_poligonos_como_envolvente(tmp_path):
     archivo.write_text("1 0.1 0.2 0.3 0.2 0.3 0.6 0.1 0.6\n", encoding="utf-8")
     (leida,) = read_yolo_labels(archivo, 100, 100)
     assert (leida.cls, leida.x1, leida.y1, leida.x2, leida.y2) == pytest.approx((1, 10, 20, 30, 60))
+
+
+def test_ap_50_95_penaliza_la_localizacion_y_el_barrido_trae_conteos():
+    from bermguard.benchmark.detection import ap_50_95, threshold_sweep
+
+    # IoU 0.6 entre verdad y predicción: cuenta a 0.5 y 0.55, no desde 0.6 en adelante.
+    imagenes = [ImageEval("a", [Box(0, 0, 10, 10, 0)], [Box(0, 0, 10, 6, 0, 0.9)])]
+    assert class_metrics(imagenes, 0, 0.25)["ap50"] == pytest.approx(1.0)
+    assert ap_50_95(imagenes, 0) == pytest.approx(0.3)
+    (fila,) = threshold_sweep(imagenes, 0, [0.5])
+    assert (fila["tp"], fila["fp"], fila["n_truth"]) == (1.0, 0.0, 1.0)
