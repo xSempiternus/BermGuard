@@ -58,3 +58,59 @@ def contiene(texto: str, clase: str) -> bool:
     """Si un archivo ya remapeado tiene al menos una instancia de ``clase``."""
     indice = str(CLASES_PROYECTO.index(clase))
     return any(linea.split()[:1] == [indice] for linea in texto.splitlines())
+
+
+def descartar_degeneradas(texto: str, minimo: float = 0.005) -> tuple[str, int]:
+    """Quita instancias cuyo ancho o alto normalizado es menor que ``minimo``.
+
+    Algunos exports de Roboflow traen polígonos de dos o tres puntos casi
+    superpuestos (un clic de más al anotar). Ultralytics los convierte en una caja
+    de menos de un píxel que no corresponde a ningún objeto. Devuelve el texto
+    limpio y cuántas instancias quitó.
+    """
+    salida = []
+    quitadas = 0
+    for linea in texto.splitlines():
+        partes = linea.split()
+        if not partes:
+            continue
+        valores = [float(v) for v in partes[1:]]
+        if len(valores) == 4:
+            ancho, alto = valores[2], valores[3]
+        else:
+            xs, ys = valores[0::2], valores[1::2]
+            ancho, alto = max(xs) - min(xs), max(ys) - min(ys)
+        if ancho < minimo or alto < minimo:
+            quitadas += 1
+            continue
+        salida.append(linea)
+    return "\n".join(salida) + ("\n" if salida else ""), quitadas
+
+
+def leer_exclusiones(texto: str) -> set[str]:
+    """Nombres de archivo de una lista de exclusión, sin comentarios ni líneas vacías.
+
+    Formato: un nombre por línea; lo que sigue a ``#`` es el motivo.
+    """
+    nombres = set()
+    for linea in texto.splitlines():
+        nombre = linea.split("#", 1)[0].strip()
+        if nombre:
+            nombres.add(nombre)
+    return nombres
+
+
+def parse_repeat(items: list[str]) -> dict[str, int]:
+    """Traduce ``["mines=5"]`` a ``{"mines": 5}``: cuántas veces entra cada fuente en train."""
+    repeticiones: dict[str, int] = {}
+    for item in items:
+        fuente, sep, veces = item.partition("=")
+        if not sep or not fuente or not veces.isdigit() or int(veces) < 1:
+            raise ValueError(f"'{item}': se espera FUENTE=N con N entero >= 1")
+        repeticiones[fuente] = int(veces)
+    return repeticiones
+
+
+def nombres_repetidos(nombre: str, veces: int) -> list[str]:
+    """``nombre`` y sus copias ``nombre_r1`` ... ``nombre_r{veces-1}``."""
+    return [nombre] + [f"{nombre}_r{i}" for i in range(1, veces)]
