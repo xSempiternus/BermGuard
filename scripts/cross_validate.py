@@ -21,6 +21,16 @@ de maquinaria (``scripts/prepare_pretrain.py``, ADR 0004). Ese preentrenamiento 
 hace una sola vez y sirve para los cuatro folds, porque ninguna de esas imágenes
 viene de los videos del proyecto.
 
+En cada fold la partición ``val`` es el video excluido, que es también el de
+evaluación. Por eso los folds se entrenan con épocas fijas, sin paciencia y sin
+validar en cada época, y se evalúa ``last.pt``: si ``best.pt`` o el corte temprano se
+eligieran mirando ese video, la métrica saldría optimista y favorecería a las
+variantes con curvas más ruidosas.
+
+Un fold terminado deja ``resumen_entrenamiento.json`` junto a sus pesos. Si la
+corrida se corta (Ctrl+C para liberar la GPU), volver a lanzar el mismo comando
+salta los folds terminados y reentrena desde cero el que quedó a medias.
+
 Uso:
     python scripts/cross_validate.py --variants base copypaste pretrain
 """
@@ -151,6 +161,7 @@ def entrenar(
     args: argparse.Namespace,
     modelo: str,
     epocas: int,
+    extra: tuple[str, ...] = (),
 ) -> None:
     subprocess.run(
         [
@@ -172,9 +183,15 @@ def entrenar(
             str(proyecto),
             "--name",
             nombre,
+            *extra,
         ],
         check=True,
     )
+
+
+def terminado(proyecto: Path, nombre: str) -> bool:
+    """Si el entrenamiento llegó al final: el resumen se escribe sólo al terminar."""
+    return resolver_pesos(proyecto / nombre / "resumen_entrenamiento.json").exists()
 
 
 def main() -> None:
@@ -188,7 +205,12 @@ def main() -> None:
         choices=["base", "copypaste", "pretrain"],
     )
     parser.add_argument("--folds", nargs="+", default=list(VIDEOS))
-    parser.add_argument("--epochs", type=int, default=80)
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=60,
+        help="Fijas, sin paciencia. detector_v1 seguía mejorando en la época 40 de 42",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
         "--batch",
@@ -218,8 +240,10 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     python = sys.executable
 
+    # El preentrenamiento sí usa best.pt y paciencia: su validación son imágenes
+    # públicas, no los videos del proyecto.
     pesos_previos = resolver_pesos(Path("weights/pretrain/externo/weights/best.pt"))
-    if "pretrain" in args.variants and not pesos_previos.exists():
+    if "pretrain" in args.variants and not terminado(Path("weights/pretrain"), "externo"):
         if args.skip_train or not args.pretrain_data.exists():
             raise SystemExit(
                 f"Falta {pesos_previos} y no se puede entrenar: corré antes prepare_pretrain.py"
@@ -240,11 +264,22 @@ def main() -> None:
         modelo = str(pesos_previos) if variante == "pretrain" else "yolo11s.pt"
         for val in args.folds:
             proyecto = Path("weights/cv") / variante
-            pesos = proyecto / val / "weights" / "best.pt"
+            pesos = proyecto / val / "weights" / "last.pt"
             fold, conteo = preparar_fold(por_video, val, variante, args.work, args.seed)
             print(f"[{variante}/{val}] {conteo}", flush=True)
-            if not args.skip_train:
-                entrenar(python, fold / "data.yaml", proyecto, val, args, modelo, args.epochs)
+            if args.skip_train or terminado(proyecto, val):
+                print(f"[{variante}/{val}] ya entrenado, sólo se evalúa", flush=True)
+            else:
+                entrenar(
+                    python,
+                    fold / "data.yaml",
+                    proyecto,
+                    val,
+                    args,
+                    modelo,
+                    args.epochs,
+                    extra=("--patience", "0", "--no-val"),
+                )
             pesos = resolver_pesos(pesos)
             salida = args.out / f"{variante}_{val}.json"
             subprocess.run(

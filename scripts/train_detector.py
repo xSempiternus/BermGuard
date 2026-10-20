@@ -69,6 +69,16 @@ def main() -> None:
         default=20,
         help="Epocas sin mejora antes de detener. Evita sobreajustar un dataset chico",
     )
+    parser.add_argument(
+        "--val",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Validar en cada época. Con --no-val sólo se valida al final: hace falta "
+            "cuando la partición 'val' es la de evaluación, para que ni best.pt ni la "
+            "paciencia se elijan mirándola"
+        ),
+    )
     parser.add_argument("--workers", type=int, default=2, help="2 en Windows; 8 en Linux")
     parser.add_argument("--device", default="auto", choices=["auto", "cuda", "cpu"])
     parser.add_argument("--seed", type=int, default=0)
@@ -102,6 +112,7 @@ def main() -> None:
         seed=args.seed,
         freeze=args.freeze or None,
         patience=args.patience,
+        val=args.val,
         project=str(args.project),
         name=args.name,
         exist_ok=True,
@@ -131,6 +142,8 @@ def main() -> None:
         "batch": args.batch,
         "imgsz": args.imgsz,
         "freeze": args.freeze,
+        "paciencia": args.patience,
+        "valida_cada_epoca": args.val,
         "semilla": args.seed,
         "runtime": describe_runtime(device),
         "pesos": str(directorio / "weights" / "best.pt"),
