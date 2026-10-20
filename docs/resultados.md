@@ -34,13 +34,14 @@ python main.py --input data/raw --output output --method all
 
 171 frames anotados a mano, estratificados por condición de luz y separados por video. La
 tabla ya incluye la auditoría de etiquetas (ADR 0009): 29 bulldozers que estaban marcados
-como `caex` pasaron a su clase.
+como `caex` pasaron a su clase, y el 2026-10-20 se agregó un bulldozer que faltaba en
+`video_03_f00126` (lista `agregados` de la auditoría).
 
 | Partición | Imágenes | `caex` | `bulldozer` |
 |---|---|---|---|
-| train (`video_01`, `02`, `03`) | 131 | 246 | 57 |
+| train (`video_01`, `02`, `03`) | 131 | 246 | 58 |
 | val (`video_04` completo) | 40 | 34 | 16 |
-| **Total** | **171** | **280** | **73** |
+| **Total** | **171** | **280** | **74** |
 
 Antes de la auditoría la proporción era de 7 CAEX por bulldozer; ahora es de 4. Separé por
 video y no al azar porque dos frames cercanos son casi la misma imagen, y con una partición
@@ -50,7 +51,13 @@ aleatoria la validación premiaría memorizar.
 
 `detector_v1` se entrenó desde `yolo11s.pt` (COCO), con un máximo de 80 épocas, `batch=8`,
 `imgsz=640`, precisión mixta y semilla 0, **con las etiquetas anteriores a la auditoría**.
-Se detuvo por paciencia en la época 42 y la mejor fue la 22. Reentrenarlo con las etiquetas
+Se detuvo por paciencia en la época 42 y la mejor fue la 22.
+
+**`detector_v1` entrenó sin 36 de los 40 frames de `video_01`.** Sus etiquetas mezclan
+cajas y polígonos en el mismo archivo, y Ultralytics 8.4 descarta esos frames enteros
+(`bermguard/training/etiquetas.py`). Vio 95 de los 131 frames de train. La validación no
+se afecta: ningún frame de `video_04` mezcla formatos, y las cifras de esta sección siguen
+siendo las medidas. LOVO ya homogeneiza las etiquetas de cada fold. Reentrenarlo con las etiquetas
 corregidas, y medir el copy-paste de bulldozers, es el siguiente paso (sección 4).
 
 ### 1.3 Métricas del detector
@@ -263,8 +270,9 @@ validarlo sobre material real hace falta video real y el perfil anotado en unos 
 
 1. **Reentrenar con las etiquetas auditadas y medir con validación cruzada el copy-paste y el
    preentrenamiento con datos públicos.** Todo está implementado
-   (`scripts/cross_validate.py --variants base copypaste pretrain`, ADR 0004 y 0009); falta
-   correrlo con la GPU libre.
+   (`scripts/gpu_session.py`, ADR 0004 y 0009, guía en
+   [`docs/entrenamiento/sesion_gpu.md`](entrenamiento/sesion_gpu.md)); falta correrlo con
+   la GPU libre, unas 10 h estimadas.
 2. **Elegir el umbral del bulldozer** con las predicciones fuera de muestra de esa
    validación cruzada, y activarlo en `configs/`.
 3. **Cerrar los 4 casos pendientes de la auditoría** (`data/auditoria_etiquetas.json`).

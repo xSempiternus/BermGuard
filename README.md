@@ -118,7 +118,7 @@ bermguard/
 ├── analytics/   geometría, altura y proximidad
 ├── pipeline/    orquestador, factory y dibujo del OSD
 ├── benchmark/   evaluación del detector y escenas sintéticas del pretil
-└── training/    copy-paste augmentation y remapeo de datasets públicos
+└── training/    copy-paste, remapeo y curación de datasets públicos, etiquetas homogéneas
 ```
 
 Tres ideas ordenan el código:
@@ -167,7 +167,9 @@ Otros documentos:
 - [`docs/showcase/`](docs/showcase/): demo interactiva y figuras, generadas con
   `scripts/make_showcase.py`.
 - [`data/README.md`](data/README.md): qué datos se versionan y cómo reproducir el
-  entrenamiento.
+  entrenamiento y el set de preentrenamiento.
+- [`docs/entrenamiento/sesion_gpu.md`](docs/entrenamiento/sesion_gpu.md): cómo correr la
+  validación cruzada en una ventana de GPU, cortarla, retomarla y qué hacer después.
 
 ### Una ambigüedad del enunciado
 
@@ -265,7 +267,7 @@ Calidad (lo mismo corre la CI en cada push):
 ```bash
 ruff check . && ruff format --check .
 mypy bermguard/          # --strict
-pytest                   # 64 tests, sin GPU, modelo ni video
+pytest                   # 98 tests, sin GPU, modelo ni video
 ```
 
 `scripts/` tiene herramientas que no son parte del pipeline, pero con las que generé la
@@ -282,8 +284,11 @@ evidencia de `docs/`:
 | `train_detector.py` | Entrena el detector |
 | `eval_detector.py` | Métricas por clase según Ultralytics |
 | `evaluate_detector.py` | Métricas en el punto de operación, con intervalos y desglose por luz |
-| `prepare_pretrain.py` | Junta datasets públicos y traduce sus clases para preentrenar |
-| `cross_validate.py` | Validación cruzada dejando un video fuera: base, copy-paste o preentrenado |
+| `import_universe.py` | Arma un export YOLO de un proyecto de Universe sin versión descargable (Mines) |
+| `prepare_pretrain.py` | Junta datasets públicos, traduce sus clases, excluye lo revisado y repite Mines |
+| `cross_validate.py` | Validación cruzada dejando un video fuera: base, copy-paste o preentrenado; reanudable por fold |
+| `summarize_lovo.py` | Resume LOVO: media por variante, diferencias pareadas, variante ganadora y umbral fuera de fold |
+| `gpu_session.py` | Chequeos previos, LOVO y resumen en un solo comando ([guía](docs/entrenamiento/sesion_gpu.md)) |
 | `benchmark_berm_synthetic.py` | Exactitud del pretil en escenas con la cresta conocida |
 | `compare_runs.py` | Compara dos corridas completas del pipeline |
 | `make_showcase.py` | Genera las figuras de `docs/showcase/` desde los datos |
@@ -296,8 +301,14 @@ evidencia de `docs/`:
 La lista completa, ordenada por objetivo y con el motivo de cada punto, está en la sección 4
 de [`docs/resultados.md`](docs/resultados.md). Lo más importante:
 
-1. **Correr la validación cruzada** (base, copy-paste y preentrenado con datos públicos), reentrenar con las etiquetas
-   auditadas y elegir el umbral del bulldozer fuera de muestra. Todo está implementado.
-2. **Validar con video real** y el perfil del pretil anotado en unos 30 frames.
-3. **Exportar el detector a ONNX/TensorRT**: con el pretil a media resolución, es la etapa
+1. **Correr la validación cruzada** (base, copy-paste y preentrenado con datos públicos
+   curados): `python scripts/gpu_session.py`, unas 10 h de GPU estimadas. El protocolo, la
+   regla de decisión y el criterio de umbral están fijados de antemano (ADR 0009, revisión
+   del 2026-10-20).
+2. **Reentrenar `detector_v2`** con la variante ganadora sobre los cuatro videos y fijar el
+   umbral del bulldozer en `configs/`. Falta una herramienta que prepare el dataset con las
+   etiquetas homogeneizadas: hoy Ultralytics descarta 36 frames de `video_01`
+   ([guía](docs/entrenamiento/sesion_gpu.md#pasos-siguientes)).
+3. **Validar con video real** y el perfil del pretil anotado en unos 30 frames.
+4. **Exportar el detector a ONNX/TensorRT**: con el pretil a media resolución, es la etapa
    más cara.

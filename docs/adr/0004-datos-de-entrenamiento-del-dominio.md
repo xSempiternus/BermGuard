@@ -63,7 +63,7 @@ Roboflow Universe y conté, con el filtro por clase, cuántas tienen bulldozer:
 
 | Dataset | Imágenes con bulldozer | Vista | Veredicto |
 |---|---|---|---|
-| [`mines-project/mines`](https://universe.roboflow.com/mines-project/mines-jo13g) (CC BY 4.0) | **68 de 261** (~75 dozers), más `dumper` | Fotos en una mina a cielo abierto, a media distancia, varias fechas entre 2022 y 2024; **polígonos** | **Usar.** El más parecido en escena y máquinas |
+| [`mines-project/mines`](https://universe.roboflow.com/mines-project/mines-jo13g) (CC BY 4.0) | **68 de 261** (70 dozers, contados al importar; ver la revisión del 2026-10-20), más `dumper` | Fotos en una mina a cielo abierto, a media distancia, varias fechas entre 2022 y 2024; **polígonos** | **Usar.** El más parecido en escena y máquinas |
 | [`bulldozer-lpoe2`](https://universe.roboflow.com/mohamads-workspace-rl4ui/bulldozer-lpoe2) (CC BY 4.0) | **1.324 de 1.324** | Mezcla de catálogo y fotos de faena a media distancia | **Usar.** Volumen y variedad de la forma del bulldozer |
 | [`ccl-kl4nk/dji_65`](https://universe.roboflow.com/ccl-kl4nk/dji_65) (CC0) | 19 de 136 (20 dozers) | Dron oblicuo sobre una mina | **Descartado.** Los 19 frames son casi seguidos de un mismo vuelo (272–290 s y 212–219 s): en la práctica, una sola máquina |
 | [`ws1/m`](https://universe.roboflow.com/ws1-i1agt/m-oi9pf) (CC BY 4.0) | 102 (+153 `dozer_night`) | Cámara de tablero de un camión minero, a nivel del suelo | **Descartado.** Otra perspectiva, dozers de pocos píxeles, y las nocturnas son versiones sintéticas de las diurnas (`*_day2night.jpg`) |
@@ -92,27 +92,109 @@ empírica, así que queda como una tercera variante de la validación cruzada de
   partida, así que la diferencia con `base` mide el preentrenamiento. Como ninguna imagen
   pública viene de estos videos, no hay fuga entre folds.
 
-Pasos para correrla, con la GPU libre:
-
-1. En cada página de Roboflow: *Download Dataset* → formato **YOLOv8** → *download zip*
-   (pide una cuenta gratuita). Descomprimir en `data/externos/mines/` y
-   `data/externos/bulldozer-lpoe2/`.
-2. Revisar los nombres en el `data.yaml` de cada uno y preparar:
-
-   ```bash
-   python scripts/prepare_pretrain.py \
-       --source data/externos/mines --source data/externos/bulldozer-lpoe2 \
-       --map dozer=bulldozer bull_dozer=bulldozer dumper=caex dumb_truck=caex \
-       --require bulldozer
-   ```
-
-   El script imprime, por fuente, cuántas imágenes quedaron, cuántas descartó por no tener
-   bulldozer y cuántas instancias hay de cada clase; el resumen queda en
-   `data/pretrain/resumen.json`. Los polígonos de `mines` se conservan tal cual.
-3. `python scripts/cross_validate.py --variants base copypaste pretrain --batch 4`.
+Los pasos de esta revisión quedaron desactualizados: Mines no tiene zip de descarga, la
+carpeta de lpoe2 es `data/externos/bulldozer/` y el comando de preparación lleva
+`--exclude` y `--repeat`. Los pasos vigentes están en la revisión siguiente y en
+[`data/README.md`](../../data/README.md).
 
 Un riesgo a mirar en el resultado: `bulldozer-lpoe2` tiene 20 veces más imágenes que
-`mines`, así que el preentrenamiento queda dominado por él. Si la variante no mejora, el
-siguiente intento es preentrenar sólo con `mines`.
+`mines`, así que el preentrenamiento queda dominado por él. La revisión siguiente lo
+corrige en parte con `--repeat mines=5`. Si la variante no mejora, el siguiente intento es
+preentrenar sólo con `mines`.
 
 Los datasets descargados quedan fuera del repo (`data/externos/`, `data/pretrain/`).
+
+## Revisión (2026-10-20): cómo se importó Mines y cómo se curó el set
+
+### Mines no tiene versión descargable
+
+[`mines-project/mines-jo13g`](https://universe.roboflow.com/mines-project/mines-jo13g)
+es público, pero el proyecto no tiene ninguna versión generada, así que no hay *Download
+Dataset* ni zip. Las imágenes y las anotaciones igual son públicas: la página de cada
+imagen las pide a un endpoint interno de Universe. Las junté desde el navegador (Chrome,
+con la sesión abierta):
+
+1. La lista de imágenes con bulldozer salió de `/datasets/roboql/publicDataset` con la
+   consulta `class:dozer split:<split>`, una vez por partición.
+2. La anotación de cada una, de
+   `/query/source?dataset=Dih8GBz9EZBNdTGYVfm1&source=<id>`.
+3. Todo quedó en `data/externos/mines/anotaciones_universe.json` (fuente, licencia,
+   consulta y, por imagen, id, nombre, partición, URL y anotación).
+
+`scripts/import_universe.py` convierte ese JSON en un export YOLO con el mismo formato que
+uno de Roboflow, para que `prepare_pretrain.py` lo trate como a cualquier otra fuente.
+Descarga cada imagen y **aplica la rotación EXIF a los píxeles** antes de guardarla:
+Roboflow anota sobre la imagen ya rotada, y una foto de celular guardada con la rotación
+sólo en el EXIF quedaría con las etiquetas giradas para cualquier lector que no la aplique.
+El script falla si la orientación guardada no calza con la de la anotación.
+
+```bash
+python scripts/import_universe.py data/externos/mines/anotaciones_universe.json \
+    --out data/externos/mines
+```
+
+Resultado, contado sobre el JSON y la carpeta generada: **68 imágenes** (50 train, 16
+valid, 2 test) y **70 dozers**, todos como polígono, más 31 `dumper` y 9 instancias de
+clases que se descartan (`drill`, `pc`, `camper`). La estimación anterior, ~75 dozers, era
+de la vista de Universe.
+
+`bulldozer-lpoe2` sí tiene versión: la 1, exportada en formato YOLO
+(`Bulldozer.v1i.yolo26.zip`), 1.324 imágenes reescaladas a 512×512. Se descomprime en
+`data/externos/bulldozer/`.
+
+### Curación
+
+Revisé a ojo las 68 imágenes de Mines y 121 de lpoe2 (muestra estratificada con semilla
+42), más las 49 escenas de lpoe2 con varias máquinas, con las etiquetas dibujadas encima.
+También busqué duplicados en todo lpoe2 por dHash (16×16, distancia ≤ 24 de 256 bits),
+verificando una muestra a ojo. Lo que encontré:
+
+- **Duplicados en lpoe2.** La lista versionada saca 215 imágenes, de 198 grupos; en 85 de
+  ellos el grupo tenía copias en train y en val (contando `test` como val, como hace
+  `prepare_pretrain.py`). Se conserva una por grupo, la de train si el grupo cruza
+  particiones. Sin esto, la validación del preentrenamiento mide en parte memoria, y
+  `best.pt` se elige con ella.
+- **Etiquetas erróneas.** Un cargador de orugas (CAT 973D) etiquetado como `Bull_dozer`, y
+  un camión de faena (CAT 793) etiquetado como `Loader`, que con `--require bulldozer`
+  quedaría además como fondo sin su `caex`.
+- **Juguetes y maquetas** sobre fondo blanco (dos imágenes).
+- **Catálogo.** En la muestra, alrededor de 8–9 % son fotos de catálogo (máquina sola,
+  fondo limpio). Se dejan: enseñan la forma de la máquina y no confunden la clase.
+- **Mines:** un duplicado de la misma toma y cinco polígonos degenerados (dos o tres
+  puntos casi superpuestos, un clic de más al anotar), que Ultralytics convierte en cajas
+  de menos de un píxel.
+
+Lo que se aplica:
+
+- `data/pretrain_excluir.txt`, **versionado**: un nombre de archivo por línea con su
+  motivo. `--exclude` lo lee. Son 220 entradas (219 de lpoe2 y 1 de Mines).
+- Las instancias degeneradas (ancho o alto normalizado < 0,5 %) se quitan siempre
+  (`descartar_degeneradas` en `bermguard/training/pretrain.py`).
+- `--repeat mines=5`: cada imagen de **train** de Mines entra cinco veces (copias con
+  sufijo `_r1`…`_r4`); val nunca se repite.
+
+**Por qué ×5.** Mines es la única fuente fotografiada en una mina real, y sin repetir son
+49 de 872 imágenes de train (5,6 %): el preentrenamiento casi no la vería. Con ×5 son 245
+de 1.068 (23 %). Más repeticiones acercarían Mines a la mitad del set, pero con 49 imágenes
+distintas eso es memorizarlas; ×5 es un punto intermedio, no un valor ajustado. Se repite
+sólo train porque repetir val no agrega información y sesgaría la elección de `best.pt`.
+
+### Set final
+
+```bash
+python scripts/prepare_pretrain.py \
+    --source data/externos/mines --source data/externos/bulldozer \
+    --map dozer=bulldozer bull_dozer=bulldozer dumper=caex dumb_truck=caex \
+    --require bulldozer --exclude data/pretrain_excluir.txt --repeat mines=5
+```
+
+Según `data/pretrain/resumen.json`:
+
+| Fuente | Train | Val | Excluidas | Degeneradas | `bulldozer` | `caex` |
+|---|---|---|---|---|---|---|
+| `mines` | 49 (245 con ×5) | 18 | 1 | 5 | 68 | 27 |
+| `bulldozer` (lpoe2) | 823 | 282 | 219 | 0 | 1.122 | 46 |
+| **Total** | **1.068** | **300** | 220 | 5 | | |
+
+Las instancias por clase están contadas sin la repetición. `scripts/gpu_session.py --check`
+rechaza un `data/pretrain/` generado sin `--exclude` o sin `--repeat`.
