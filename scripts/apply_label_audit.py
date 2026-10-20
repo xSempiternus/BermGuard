@@ -4,7 +4,8 @@ La auditoría encontró bulldozers etiquetados como ``caex``: pre-anotaciones de
 modelo COCO, que entrega toda la maquinaria como ``truck``, que quedaron en formato
 caja sin pasar por la corrección. Cada cambio registra la línea original, y el
 script sólo la modifica si sigue siendo exactamente esa: es idempotente y no pisa
-una corrección hecha a mano después.
+una corrección hecha a mano después. ``agregados`` son máquinas que no tenían
+etiqueta; se agregan una sola vez.
 
 Uso:
     python scripts/apply_label_audit.py            # aplica
@@ -43,6 +44,16 @@ def main() -> None:
         else:
             distintos += 1
             print(f"! {ruta}:{cambio['linea']} cambió desde la auditoría; no se toca")
+
+    # Instancias que faltaban: se agregan sólo si la línea exacta no está ya.
+    for agregado in auditoria.get("agregados", []):
+        ruta = RAIZ / agregado["archivo"]
+        lineas = por_archivo.setdefault(ruta, ruta.read_text(encoding="utf-8").splitlines())
+        if agregado["linea"] in lineas:
+            ya += 1
+        else:
+            lineas.append(agregado["linea"])
+            aplicados += 1
 
     if not args.check:
         for ruta, lineas in por_archivo.items():

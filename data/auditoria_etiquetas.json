@@ -261,5 +261,13 @@
    "original": "0 0.4747395833333333 0.5064814814814815 0.0734375 0.06481481481481481",
    "motivo": "máquina oscura con polvo, tipo indistinguible; se deja como caex"
   }
+ ],
+ "agregados": [
+  {
+   "archivo": "train/video_03_f00126_jpg.rf.48c4cd4a1ae34f247b554537bc8f2a8a.txt",
+   "linea": "1 0.45078125 0.56041667 0.17031250 0.12083333",
+   "fecha": "2026-10-20",
+   "motivo": "bulldozer entre el polvo sin etiqueta; los frames vecinos f00120 y f00132 sí lo tienen. Caja trazada a mano sobre el frame (x 468-686, y 360-447 px)"
+  }
  ]
 }
