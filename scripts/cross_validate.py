@@ -183,6 +183,8 @@ def entrenar(
             str(proyecto),
             "--name",
             nombre,
+            "--device",
+            args.device,
             *extra,
         ],
         check=True,
@@ -234,6 +236,28 @@ def main() -> None:
     parser.add_argument("--pretrain-epochs", type=int, default=50)
     parser.add_argument("--out", type=Path, default=Path("docs/experimentos/lovo"))
     parser.add_argument("--skip-train", action="store_true", help="Sólo reevaluar")
+    parser.add_argument(
+        "--base-model",
+        default="weights/yolo11s.pt",
+        help="Pesos COCO de partida; la copia local evita depender de la red",
+    )
+    parser.add_argument(
+        "--base-model",
+        default="weights/yolo11s.pt",
+        help="Pesos COCO de partida; la copia local evita depender de la red",
+    )
+    parser.add_argument(
+        "--weights-root",
+        type=Path,
+        default=Path("weights"),
+        help="Raíz de pesos. Cambiarla en pruebas, para no dejar folds 'terminados' falsos",
+    )
+    parser.add_argument(
+        "--device",
+        default="cuda",
+        choices=["cuda", "cpu"],
+        help="cpu sólo para pruebas de humo: entrenar en CPU tarda horas por fold",
+    )
     args = parser.parse_args()
 
     por_video = recolectar(args.dataset)
@@ -242,8 +266,10 @@ def main() -> None:
 
     # El preentrenamiento sí usa best.pt y paciencia: su validación son imágenes
     # públicas, no los videos del proyecto.
-    pesos_previos = resolver_pesos(Path("weights/pretrain/externo/weights/best.pt"))
-    if "pretrain" in args.variants and not terminado(Path("weights/pretrain"), "externo"):
+    pesos_previos = resolver_pesos(
+        args.weights_root / "pretrain" / "externo" / "weights" / "best.pt"
+    )
+    if "pretrain" in args.variants and not terminado(args.weights_root / "pretrain", "externo"):
         if args.skip_train or not args.pretrain_data.exists():
             raise SystemExit(
                 f"Falta {pesos_previos} y no se puede entrenar: corré antes prepare_pretrain.py"
@@ -252,18 +278,18 @@ def main() -> None:
         entrenar(
             python,
             args.pretrain_data,
-            Path("weights/pretrain"),
+            args.weights_root / "pretrain",
             "externo",
             args,
-            "yolo11s.pt",
+            args.base_model,
             args.pretrain_epochs,
         )
         pesos_previos = resolver_pesos(pesos_previos)
 
     for variante in args.variants:
-        modelo = str(pesos_previos) if variante == "pretrain" else "yolo11s.pt"
+        modelo = str(pesos_previos) if variante == "pretrain" else args.base_model
         for val in args.folds:
-            proyecto = Path("weights/cv") / variante
+            proyecto = args.weights_root / "cv" / variante
             pesos = proyecto / val / "weights" / "last.pt"
             fold, conteo = preparar_fold(por_video, val, variante, args.work, args.seed)
             print(f"[{variante}/{val}] {conteo}", flush=True)
@@ -294,6 +320,8 @@ def main() -> None:
                     str(fold / "labels" / "val"),
                     "--out",
                     str(salida),
+                    "--device",
+                    args.device,
                 ],
                 check=True,
             )
