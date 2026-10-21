@@ -8,6 +8,7 @@ data/
 ├── labeling/                frames extraídos para anotar  NO versionado
 ├── export/                  exportación de la anotación   NO versionado
 ├── dataset/
+│   ├── data.yaml            clases y rutas relativas      SÍ versionado
 │   ├── labels/train, val    anotaciones                   SÍ versionado
 │   └── images/train, val    frames                        NO versionado
 ├── auditoria_etiquetas.json correcciones de etiquetas     SÍ versionado
@@ -54,11 +55,16 @@ python scripts/split_dataset.py data/export --out data/dataset --val video_04
 
 No es aleatoria. `video_04` queda completo para validación, porque los frames de un mismo
 video son casi iguales y una partición aleatoria mediría memoria. Elegí `video_04` y no
-`video_03` porque este solo tiene 4 bulldozers.
+`video_03` porque este solo tenía 4 bulldozers antes de la auditoría (hoy tiene 17).
+
+`split_dataset.py` también escribe `data/dataset/data.yaml`, sin la clave `path`. Así
+Ultralytics resuelve `images/train` e `images/val` desde la carpeta del YAML y el dataset
+sigue funcionando si el repositorio se mueve. Antes llevaba una ruta absoluta que quedó
+apuntando a la ubicación vieja del repo.
 
 ## Etiquetas que mezclan cajas y polígonos
 
-36 de los 40 frames de `video_01` tienen en el mismo archivo cajas (pre-anotaciones sin
+36 de los 51 frames de `video_01` tienen en el mismo archivo cajas (pre-anotaciones sin
 corregir) y polígonos. Ultralytics 8.4 descarta esos frames enteros. Las etiquetas
 versionadas se dejan así, porque la auditoría identifica cada corrección por su línea
 original; se homogeneizan al copiarlas a la carpeta de entrenamiento

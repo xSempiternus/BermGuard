@@ -53,12 +53,28 @@ aleatoria la validación premiaría memorizar.
 `imgsz=640`, precisión mixta y semilla 0, **con las etiquetas anteriores a la auditoría**.
 Se detuvo por paciencia en la época 42 y la mejor fue la 22.
 
-**`detector_v1` entrenó sin 36 de los 40 frames de `video_01`.** Sus etiquetas mezclan
+**`detector_v1` entrenó sin 36 de los 51 frames de `video_01`.** Sus etiquetas mezclan
 cajas y polígonos en el mismo archivo, y Ultralytics 8.4 descarta esos frames enteros
 (`bermguard/training/etiquetas.py`). Vio 95 de los 131 frames de train. La validación no
 se afecta: ningún frame de `video_04` mezcla formatos, y las cifras de esta sección siguen
 siendo las medidas. LOVO ya homogeneiza las etiquetas de cada fold. Reentrenarlo con las etiquetas
 corregidas, y medir el copy-paste de bulldozers, es el siguiente paso (sección 4).
+
+**Eso explica buena parte de la debilidad del bulldozer.** Con las etiquetas auditadas,
+train tiene 58 bulldozers: 27 en `video_01`, 14 en `video_02` y 17 en `video_03`. 25 de
+los 27 de `video_01` están en los frames descartados, así que los frames que vio
+`detector_v1` contienen 33 de los 58 (57 %). Y los vio con las etiquetas anteriores a la
+auditoría: de esos 33, 24 estaban marcados como `caex` y uno no estaba etiquetado (el
+agregado del 2026-10-20). Aprendió la clase con 8 cajas de bulldozer. Es coherente con su
+AP@0.5 de 0.306 en la validación de Ultralytics, sobre las etiquetas originales
+(`docs/entrenamiento/metricas_por_clase.json`), y con su matriz de confusión normalizada
+(`docs/entrenamiento/confusion_matrix_normalized.png`): no predice `bulldozer` nunca; de
+los bulldozers de validación, el 45 % sale como `caex` y el 55 % como fondo. Ninguna cifra
+de esta sección cambia por esto.
+
+Los bulldozers por video son 27 (`video_01`), 14 (`video_02`), 17 (`video_03`) y 16
+(`video_04`). En LOVO cada fold se valida sobre 14 a 27 bulldozers, así que el AP del
+bulldozer de un fold se mueve con pocas máquinas.
 
 ### 1.3 Métricas del detector
 
@@ -272,7 +288,8 @@ validarlo sobre material real hace falta video real y el perfil anotado en unos 
    preentrenamiento con datos públicos.** Todo está implementado
    (`scripts/gpu_session.py`, ADR 0004 y 0009, guía en
    [`docs/entrenamiento/sesion_gpu.md`](entrenamiento/sesion_gpu.md)); falta correrlo con
-   la GPU libre, unas 10 h estimadas.
+   la GPU libre, unas 10 h estimadas, más unas 3,4 h si `copypaste` gana y hay que
+   entrenar su control de cómputo (`base2x`, ADR 0009, revisión del 2026-10-21).
 2. **Elegir el umbral del bulldozer** con las predicciones fuera de muestra de esa
    validación cruzada, y activarlo en `configs/`.
 3. **Cerrar los 4 casos pendientes de la auditoría** (`data/auditoria_etiquetas.json`).

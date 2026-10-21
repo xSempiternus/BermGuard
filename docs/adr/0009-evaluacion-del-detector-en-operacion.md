@@ -121,7 +121,7 @@ los videos del proyecto.
 
 ### Etiquetas homogeneizadas
 
-Las etiquetas de 36 de los 40 frames de `video_01` mezclan cajas (pre-anotaciones sin
+Las etiquetas de 36 de los 51 frames de `video_01` mezclan cajas (pre-anotaciones sin
 corregir) y polígonos. Ultralytics 8.4 trata un archivo así como corrupto y descarta la
 imagen entera. Con el protocolo anterior, `base` habría entrenado sin esos frames y
 `copypaste` los habría visto a través de sus copias aumentadas, lo que le habría atribuido
@@ -184,6 +184,9 @@ resumen lo marca.
   veredicto descansa en la consistencia entre folds, no en un intervalo de Δ dentro de
   cada video.
 - Cuatro videos generados con IA no son una muestra de minas (ADR 0004).
+- **Pasos de optimización desiguales.** Faltaba en esta lista: `copypaste` hace el doble de
+  pasos que `base` con las mismas épocas. Se agregó con su control en la revisión del
+  2026-10-21.
 
 ### Consecuencias
 
@@ -195,7 +198,68 @@ resumen lo marca.
   libre, y después corre LOVO y el resumen.
 - Duración estimada en la GPU de desarrollo, extrapolada de una prueba de humo en CPU de
   toda la cadena: unas 10 h ± 25 % (sección "Durante" de
-  [`sesion_gpu.md`](../entrenamiento/sesion_gpu.md)). No es un número medido.
+  [`sesion_gpu.md`](../entrenamiento/sesion_gpu.md)). No es un número medido. Si
+  `copypaste` resulta candidata, el control `base2x` suma unas 3,4 h (revisión del
+  2026-10-21).
 - `scripts/summarize_lovo.py` escribe `docs/experimentos/lovo/resumen.json` y
   `resumen.md`. **Todavía no hay resultados**: esta revisión fija el método, no el
   ganador.
+
+## Revisión (2026-10-21): control de cómputo para `copypaste`
+
+Escrita antes de entrenar ningún fold, igual que la anterior: fija qué se mide y cómo se
+decide **antes** de ver un resultado. Implementación: `bermguard/benchmark/lovo.py`
+(`CONTROL`), `scripts/cross_validate.py` (`--variants base2x`) y `scripts/gpu_session.py`.
+
+### El problema
+
+`copypaste` escribe un frame aumentado por cada frame de entrenamiento, así que su fold
+tiene el doble de imágenes que el de `base`. Armando los folds con
+`cross_validate.preparar_fold`:
+
+| Fold (video fuera) | Imágenes de train, `base` | Imágenes de train, `copypaste` |
+|---|---|---|
+| `video_01` | 120 | 240 |
+| `video_02`, `video_03`, `video_04` | 131 | 262 |
+
+Con 60 épocas fijas y batch 4, `copypaste` hace unas 66 iteraciones por época y `base`
+unas 33: el doble de pasos de optimización. `detector_v1` seguía mejorando en la época 40
+de 42, así que más pasos solos pueden mejorar a `base`. Una victoria de
+`copypaste` podría ser de cómputo y no de augmentation. Este riesgo no estaba entre los
+declarados en la revisión del 2026-10-20.
+
+### Decisión
+
+- **Variante de control `base2x`**: `base` con el doble de épocas (120), es decir, los
+  mismos pasos que `copypaste`. Misma partición y semilla, y también se evalúa `last.pt`.
+- **`copypaste` sólo puede ser candidata si además da `mejora` en el AP@0.5 del bulldozer
+  contra `base2x`**, con la misma regla pareada por fold (Δ > 0,01 en al menos 3 de 4 folds y
+  media ≥ 0,02). El resto de la regla no cambia: se sigue comparando contra `base`.
+- **Sin los cuatro folds de `base2x`**, la decisión queda `pendiente_control`: `copypaste`
+  no es candidata y el motivo de la decisión dice que es provisoria.
+- **`base2x` nunca es candidata.** Es un control, no una variante que se pueda adoptar.
+  Si `base2x` da `mejora` contra `base`, eso dice que 60 épocas eran pocas: la decisión
+  marca `epocas_dobles` y la ganadora, sea cual sea, se reentrena para v2 con 120 épocas.
+- El resumen muestra la diferencia pareada de `copypaste` contra `base2x` (media, mínimo,
+  máximo y folds), no sólo el veredicto, porque es la evidencia que decide.
+- La igualación de pasos es aproximada: Ultralytics apaga el mosaico en las últimas 10
+  épocas fijas (`close_mosaic`), que en `base2x` son 10 de 120 y en `copypaste` 10 de 60.
+- `pretrain` no se compara contra `base2x`: entrena con las mismas imágenes y épocas que
+  `base`, así que su diferencia no es de pasos.
+
+### Por qué un control condicional
+
+Entrenar `base2x` siempre cuesta cuatro entrenamientos de 120 épocas, unas 3,4 h con la
+estimación de `base` (~1,7 h para 4 folds × 60 épocas). Sólo hace falta si `copypaste`
+ganaría: si no es candidata contra `base`, el control no cambia la decisión.
+`scripts/gpu_session.py` corre el resumen, y si queda `pendiente_control` entrena
+`base2x` y vuelve a resumir, en la misma sesión.
+
+### Consecuencias
+
+- La sesión de GPU dura unas 10 h si `copypaste` no es candidata, y unas 3,4 h más si lo
+  es. Las dos son estimaciones, no mediciones
+  ([`sesion_gpu.md`](../entrenamiento/sesion_gpu.md)).
+- Una semilla por fold sigue siendo un riesgo: el control iguala los pasos, no el ruido
+  de inicialización.
+- **Todavía no hay resultados.** Esta revisión cambia la regla antes de los datos.

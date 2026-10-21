@@ -286,9 +286,9 @@ evidencia de `docs/`:
 | `evaluate_detector.py` | Métricas en el punto de operación, con intervalos y desglose por luz |
 | `import_universe.py` | Arma un export YOLO de un proyecto de Universe sin versión descargable (Mines) |
 | `prepare_pretrain.py` | Junta datasets públicos, traduce sus clases, excluye lo revisado y repite Mines |
-| `cross_validate.py` | Validación cruzada dejando un video fuera: base, copy-paste o preentrenado; reanudable por fold |
+| `cross_validate.py` | Validación cruzada dejando un video fuera: base, copy-paste o preentrenado, y `base2x` (control de cómputo del copy-paste); reanudable por fold |
 | `summarize_lovo.py` | Resume LOVO: media por variante, diferencias pareadas, variante ganadora y umbral fuera de fold |
-| `gpu_session.py` | Chequeos previos, LOVO y resumen en un solo comando ([guía](docs/entrenamiento/sesion_gpu.md)) |
+| `gpu_session.py` | Chequeos previos, LOVO y resumen en un solo comando; entrena `base2x` si el copy-paste lo necesita ([guía](docs/entrenamiento/sesion_gpu.md)) |
 | `benchmark_berm_synthetic.py` | Exactitud del pretil en escenas con la cresta conocida |
 | `compare_runs.py` | Compara dos corridas completas del pipeline |
 | `make_showcase.py` | Genera las figuras de `docs/showcase/` desde los datos |
@@ -302,9 +302,10 @@ La lista completa, ordenada por objetivo y con el motivo de cada punto, está en
 de [`docs/resultados.md`](docs/resultados.md). Lo más importante:
 
 1. **Correr la validación cruzada** (base, copy-paste y preentrenado con datos públicos
-   curados): `python scripts/gpu_session.py`, unas 10 h de GPU estimadas. El protocolo, la
-   regla de decisión y el criterio de umbral están fijados de antemano (ADR 0009, revisión
-   del 2026-10-20).
+   curados): `python scripts/gpu_session.py`, unas 10 h de GPU estimadas, más unas 3,4 h si
+   el copy-paste necesita su control de cómputo. El protocolo, la regla de decisión y el
+   criterio de umbral están fijados de antemano (ADR 0009, revisiones del 2026-10-20 y del
+   2026-10-21).
 2. **Reentrenar `detector_v2`** con la variante ganadora sobre los cuatro videos y fijar el
    umbral del bulldozer en `configs/`. Falta una herramienta que prepare el dataset con las
    etiquetas homogeneizadas: hoy Ultralytics descarta 36 frames de `video_01`

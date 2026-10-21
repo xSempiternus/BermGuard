@@ -1,7 +1,8 @@
 # Sesión de GPU: validación cruzada LOVO
 
-Guía para correr la validación cruzada dejando un video fuera (ADR 0009, revisión del
-2026-10-20) con las tres variantes: `base`, `copypaste` y `pretrain`. La GPU de desarrollo
+Guía para correr la validación cruzada dejando un video fuera (ADR 0009, revisiones del
+2026-10-20 y del 2026-10-21) con las tres variantes: `base`, `copypaste` y `pretrain`, más
+el control `base2x` si hace falta. La GPU de desarrollo
 (RTX 3050 Ti, 4 GB) se comparte con el escritorio, así que esto se corre en una ventana en
 que la máquina está libre. Todo se lanza con un solo comando, `scripts/gpu_session.py`.
 
@@ -43,19 +44,24 @@ python scripts/gpu_session.py
 ```
 
 Corre los chequeos, `cross_validate.py --variants base copypaste pretrain --batch 4` y
-`summarize_lovo.py`. Si un chequeo falla, se detiene; `--force` sigue igual (por ejemplo,
+`summarize_lovo.py`. Si el resumen queda `pendiente_control` (`copypaste` sería candidata
+contra `base`), entrena además el control `base2x` y vuelve a resumir. `copypaste` hace el
+doble de pasos que `base`, y `base2x` le iguala los pasos para saber si su mejora es de
+augmentation o de cómputo (ADR 0009, revisión del 2026-10-21). Si un chequeo falla, se detiene; `--force` sigue igual (por ejemplo,
 si el aviso de VRAM es por un programa que se va a cerrar).
 
 Orden y duración estimada en la GPU de desarrollo libre. Son estimaciones extrapoladas de
-una prueba de humo en CPU, no mediciones: **unas 10 h en total, ± 25 %**.
+una prueba de humo en CPU, no mediciones: **unas 10 h en total, ± 25 %**, y unas 3,4 h más
+si hace falta el control.
 
 | Etapa | Qué entrena | Estimado |
 |---|---|---|
 | 1. Preentrenamiento | 1 modelo sobre `data/pretrain` (50 épocas, con paciencia) | hasta ~3,3 h |
 | 2. `base` | 4 folds × 60 épocas | ~1,7 h |
-| 3. `copypaste` | 4 folds × 60 épocas, el doble de frames de train | ~3,5 h |
+| 3. `copypaste` | 4 folds × 60 épocas, el doble de frames de train (y de pasos) | ~3,5 h |
 | 4. `pretrain` | 4 folds × 60 épocas desde el preentrenado | ~1,7 h |
 | 5. Resumen | `summarize_lovo.py` | segundos |
+| 6. `base2x`, sólo si queda `pendiente_control` | 4 folds × 120 épocas, y otro resumen | ~3,4 h |
 
 El preentrenamiento va primero porque `cross_validate.py` lo necesita antes de empezar los
 folds de `pretrain`, y se hace una sola vez para los cuatro. Puede terminar antes de 3,3 h
@@ -70,14 +76,23 @@ en `docs/experimentos/lovo/<variante>_<video>.json`.
 
 Para repartir la corrida en varias ventanas se puede limitar a algunas variantes:
 `python scripts/gpu_session.py --variants base copypaste`. El resumen necesita `base`, y
-una variante sólo puede ganar si tiene los cuatro folds.
+una variante sólo puede ganar si tiene los cuatro folds. `gpu_session.py --variants` no
+acepta `base2x`; para entrenar el control a mano:
+`python scripts/cross_validate.py --variants base2x --batch 4` y después
+`python scripts/summarize_lovo.py`. Si se corta durante `base2x`, volver a lanzar
+`gpu_session.py` salta los folds terminados, ve el resumen todavía pendiente y retoma el
+control.
 
 ## Después
 
 1. **Leer `docs/experimentos/lovo/resumen.md`.** Tiene la media y la dispersión por
    variante, las diferencias pareadas contra `base` con su veredicto, la variante elegida
    por la regla y el umbral de bulldozer fuera de fold. La regla y los riesgos están en el
-   ADR 0009 (revisión del 2026-10-20); no cambiarla después de ver los números.
+   ADR 0009 (revisiones del 2026-10-20 y del 2026-10-21); no cambiarla después de ver los
+   números. Si el motivo de la decisión dice "Provisoria", faltan folds de `base2x` y la
+   ganadora no vale todavía: entrenar el control y volver a resumir. Si dice "entrenar
+   v2 con el doble de épocas" (`epocas_dobles` en `resumen.json`), `base2x` mejoró a
+   `base`: 60 épocas eran pocas, y el v2 se entrena con 120.
 2. **Revisar avisos del resumen**: un umbral marcado "borde de la grilla" (el óptimo puede
    estar bajo 0,01) o "no cumple el mínimo" (ningún umbral llega a precisión 0,5).
 
@@ -88,7 +103,7 @@ una variante sólo puede ganar si tiene los cuatro folds.
    el preentrenado si ganó `pretrain`.
 
    **Pendiente de herramienta.** Hoy `train_detector.py --data data/dataset/data.yaml`
-   sufre el mismo descarte que tenía LOVO: Ultralytics salta 36 de los 40 frames de
+   sufre el mismo descarte que tenía LOVO: Ultralytics salta 36 de los 51 frames de
    `video_01` porque sus etiquetas mezclan cajas y polígonos. Hace falta un script que
    copie `data/dataset` a una carpeta de entrenamiento pasando cada etiqueta por
    `bermguard.training.etiquetas.homogeneizar` (como hace `preparar_fold` en
