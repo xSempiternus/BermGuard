@@ -155,7 +155,8 @@ def main() -> None:
         f"# Particion agrupada por video. Validacion: {args.val} completo.\n"
         "# La particion NO es aleatoria: frames vecinos del mismo clip estan\n"
         "# correlacionados y mezclarlos entre particiones infla la metrica.\n"
-        f"path: {args.out.resolve().as_posix()}\n"
+        # Sin 'path': Ultralytics usa la carpeta de este archivo, y el dataset sigue
+        # funcionando si el repo se mueve (una ruta absoluta quedó apuntando a otra).
         "train: images/train\n"
         "val: images/val\n"
         f"nc: {len(args.clases)}\n"

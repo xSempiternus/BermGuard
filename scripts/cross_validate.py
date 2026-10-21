@@ -209,7 +209,8 @@ def main() -> None:
         "--variants",
         nargs="+",
         default=["base", "copypaste"],
-        choices=["base", "copypaste", "pretrain"],
+        choices=["base", "copypaste", "pretrain", "base2x"],
+        help="base2x: base con el doble de épocas, control de cómputo de copypaste (ADR 0009)",
     )
     parser.add_argument("--folds", nargs="+", default=list(VIDEOS))
     parser.add_argument(
@@ -288,6 +289,9 @@ def main() -> None:
 
     for variante in args.variants:
         modelo = str(pesos_previos) if variante == "pretrain" else args.base_model
+        # copypaste duplica las imágenes de train: con las mismas épocas hace el doble de
+        # pasos. base2x le iguala los pasos para separar augmentation de cómputo.
+        epocas = args.epochs * 2 if variante == "base2x" else args.epochs
         for val in args.folds:
             proyecto = args.weights_root / "cv" / variante
             pesos = proyecto / val / "weights" / "last.pt"
@@ -303,7 +307,7 @@ def main() -> None:
                     val,
                     args,
                     modelo,
-                    args.epochs,
+                    epocas,
                     extra=("--patience", "0", "--no-val"),
                 )
             pesos = resolver_pesos(pesos)

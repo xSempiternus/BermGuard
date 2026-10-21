@@ -267,6 +267,8 @@ def test_gana_la_que_mejora_el_bulldozer_sin_romper_caex():
         "copypaste": variante([0.5, 0.6, 0.35, 0.65]),
         # Mejora más el bulldozer, pero el CAEX cae 0.1 en un fold.
         "pretrain": variante([0.6, 0.7, 0.5, 0.8], aps_caex=(0.7, 0.6, 0.7, 0.7)),
+        # El doble de épocas no le da nada a base: la mejora de copypaste no es de pasos.
+        "base2x": variante([0.4, 0.5, 0.3, 0.6]),
     }
     d = decidir(datos)
     assert d["ganadora"] == "copypaste"
@@ -289,6 +291,7 @@ def test_empate_entre_candidatas_gana_la_mas_simple():
         "base": variante([0.4] * 4),
         "pretrain": variante([0.505] * 4),
         "copypaste": variante([0.5] * 4),
+        "base2x": variante([0.4] * 4),
     }
     assert decidir(datos)["ganadora"] == "copypaste"
     datos["pretrain"] = variante([0.6] * 4)
@@ -303,6 +306,39 @@ def test_variante_con_folds_incompletos_no_es_candidata():
     assert any("incompletos" in m for m in d["evaluacion"]["copypaste"]["motivos"])
 
 
+def test_copypaste_sin_control_queda_pendiente():
+    datos = {"base": variante([0.4] * 4), "copypaste": variante([0.6] * 4)}
+    d = decidir(datos)
+    assert d["pendiente_control"] is True
+    assert d["ganadora"] == "base"
+    assert any("base2x" in m for m in d["evaluacion"]["copypaste"]["motivos"])
+
+
+def test_copypaste_que_no_supera_al_control_de_pasos_no_gana():
+    datos = {
+        "base": variante([0.4] * 4),
+        "copypaste": variante([0.6] * 4),
+        # Con los mismos pasos, base alcanza a copypaste: la mejora era de cómputo.
+        "base2x": variante([0.6] * 4),
+    }
+    d = decidir(datos)
+    assert d["pendiente_control"] is False
+    assert d["ganadora"] == "base"
+    assert any("pasos" in m for m in d["evaluacion"]["copypaste"]["motivos"])
+    assert d["evaluacion"]["base2x"]["candidata"] is False
+
+
+def test_el_control_no_afecta_a_pretrain():
+    datos = {
+        "base": variante([0.4] * 4),
+        "pretrain": variante([0.6] * 4),
+        "base2x": variante([0.7] * 4),
+    }
+    d = decidir(datos)
+    assert d["ganadora"] == "pretrain"
+    assert d["pendiente_control"] is False
+
+
 # --- Resumen, JSON y markdown ------------------------------------------------
 
 
@@ -310,6 +346,7 @@ def test_resumen_de_punta_a_punta_desde_archivos(tmp_path):
     datos = {
         "base": variante([0.4, 0.5, 0.3, 0.6]),
         "copypaste": variante([0.5, 0.6, 0.35, 0.65]),
+        "base2x": variante([0.4, 0.5, 0.3, 0.6]),
     }
     datos["base"]["video_02"]["por_clase"]["bulldozer"]["precision"] = float("nan")
     for v, folds in datos.items():
@@ -318,7 +355,7 @@ def test_resumen_de_punta_a_punta_desde_archivos(tmp_path):
     (tmp_path / "resumen.json").write_text("{}", encoding="utf-8")  # no es un fold
 
     leidos = cargar(tmp_path)
-    assert set(leidos) == {"base", "copypaste"}
+    assert set(leidos) == {"base", "copypaste", "base2x"}  # el nombre con dígito se lee
     resumen = resumir_lovo(leidos)
     assert resumen["decision"]["ganadora"] == "copypaste"
     assert resumen["umbral_produccion"]["variante"] == "copypaste"

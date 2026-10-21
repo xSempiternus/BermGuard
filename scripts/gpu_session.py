@@ -26,6 +26,7 @@ VARIANTES = ("base", "copypaste", "pretrain")
 VRAM_MINIMA_MB = 2800  # con batch 4 el entrenamiento usa ~2.5 GB
 DISCO_MINIMO_GB = 5  # 13 entrenamientos con checkpoints de 20-80 MB, más los folds
 PROCESOS_PESADOS = ("blender", "rocketleague", "valorant", "obs64")
+RESUMEN = Path("docs/experimentos/lovo/resumen.json")
 
 
 def vram_libre_mb() -> tuple[int, list[str]]:
@@ -113,20 +114,29 @@ def main() -> None:
         raise SystemExit("Chequeos fallidos; corregir o lanzar con --force.")
 
     python = sys.executable
-    subprocess.run(
-        [
-            python,
-            "scripts/cross_validate.py",
-            "--variants",
-            *args.variants,
-            "--batch",
-            str(args.batch),
-            "--base-model",
-            args.base_model,
-        ],
-        check=True,
-    )
-    subprocess.run([python, "scripts/summarize_lovo.py"], check=True)
+
+    def lovo(variantes: list[str]) -> None:
+        subprocess.run(
+            [
+                python,
+                "scripts/cross_validate.py",
+                "--variants",
+                *variantes,
+                "--batch",
+                str(args.batch),
+                "--base-model",
+                args.base_model,
+            ],
+            check=True,
+        )
+        subprocess.run([python, "scripts/summarize_lovo.py"], check=True)
+
+    lovo(args.variants)
+    # Si copypaste gana, puede ser por hacer el doble de pasos: se entrena el control
+    # base2x (unas 3,4 h más) y se vuelve a decidir. Ver ADR 0009.
+    if json.loads(RESUMEN.read_text(encoding="utf-8"))["decision"].get("pendiente_control"):
+        print("\ncopypaste es candidata: entrenando el control base2x (mismos pasos)")
+        lovo(["base2x"])
     print(
         "\nListo. Revisar docs/experimentos/lovo/resumen.md: variante ganadora y umbral "
         "de bulldozer fuera de fold. Lo que sigue (reentrenar el detector v2 con la "

@@ -60,6 +60,14 @@ Gana la candidata con mayor mejora media del bulldozer; si dos quedan a menos de
 ``pretrain`` (un entrenamiento extra). Si ninguna es candidata, gana ``base`` por
 parsimonia. La decisión usa AP@0.5, que no depende del umbral; el umbral se elige después,
 sobre la variante ganadora.
+
+**Control de cómputo** (``CONTROL``, ``base2x``). ``copypaste`` duplica las imágenes de
+entrenamiento, así que con las mismas épocas fijas hace el doble de pasos de optimización
+que ``base``. Su mejora puede ser de cómputo y no de augmentation. ``base2x`` es ``base``
+con el doble de épocas, es decir, los mismos pasos que ``copypaste``. Si ``copypaste``
+sería candidata, además tiene que dar ``mejora`` en el AP@0.5 del bulldozer contra
+``base2x``. Sin los folds de ``base2x``, la decisión queda ``pendiente_control`` y
+``scripts/gpu_session.py`` los entrena. ``base2x`` nunca es candidata: es un control.
 """
 
 from __future__ import annotations
@@ -79,7 +87,9 @@ CLASES = ("bulldozer", "caex")
 METRICAS = ("ap50", "ap50_95", "precision", "recall", "f1")
 VARIANTES = ("base", "copypaste", "pretrain")
 """También es el orden de simplicidad para desempatar."""
-PATRON_ARCHIVO = re.compile(r"^(?P<variante>[a-z]+)_(?P<video>video_\d+)\.json$")
+CONTROL = "base2x"
+"""``base`` con el doble de épocas: los mismos pasos de optimización que ``copypaste``."""
+PATRON_ARCHIVO = re.compile(r"^(?P<variante>[a-z0-9]+)_(?P<video>video_\d+)\.json$")
 
 Reporte = Mapping[str, Any]
 Folds = Mapping[str, Reporte]
@@ -412,9 +422,13 @@ def elegir_variante(
     folds_base = set(datos.get("base", {}))
     evaluacion: dict[str, Any] = {}
     candidatas: list[tuple[str, float]] = []
+    pendiente_control = False
     for variante in [v for v in VARIANTES if v in comparaciones] + sorted(
         set(comparaciones) - set(VARIANTES)
     ):
+        if variante == CONTROL:
+            evaluacion[variante] = {"candidata": False, "motivos": ["control de cómputo"]}
+            continue
         bull = comparaciones[variante]["bulldozer"]["ap50"]
         caex = comparaciones[variante]["caex"]["ap50"]
         motivos = []
@@ -429,6 +443,19 @@ def elegir_variante(
             motivos.append(f"AP@0.5 caex cae en media más de {regla.caida_media_caex}")
         if caex["n_folds"] and caex["minimo"] < -regla.caida_fold_caex:
             motivos.append(f"AP@0.5 caex cae más de {regla.caida_fold_caex} en algún fold")
+        if variante == "copypaste" and not motivos:
+            if set(datos.get(CONTROL, {})) != folds_base:
+                pendiente_control = True
+                motivos.append(f"pendiente: falta el control {CONTROL} (mismos pasos)")
+            else:
+                control = diferencia_pareada(
+                    datos[CONTROL], datos[variante], "bulldozer", "ap50", regla
+                )
+                if control["veredicto"] != "mejora":
+                    motivos.append(
+                        f"AP@0.5 bulldozer contra {CONTROL}: {control['veredicto']} "
+                        "(la mejora puede ser de pasos de entrenamiento)"
+                    )
         evaluacion[variante] = {"candidata": not motivos, "motivos": motivos}
         if not motivos:
             candidatas.append((variante, bull["media"]))
@@ -443,11 +470,14 @@ def elegir_variante(
             f"{ganadora} mejora el AP@0.5 del bulldozer de forma consistente sin degradar "
             "el del CAEX más de lo tolerado."
         )
+    if pendiente_control:
+        motivo += f" Provisoria: falta entrenar {CONTROL} para juzgar a copypaste."
     return {
         "ganadora": ganadora,
         "motivo": motivo,
         "regla": asdict(regla),
         "evaluacion": evaluacion,
+        "pendiente_control": pendiente_control,
     }
 
 
