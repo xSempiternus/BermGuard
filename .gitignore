@@ -32,6 +32,8 @@ data/cv/
 # Datasets públicos descargados y su versión remapeada: se regeneran (ADR 0004).
 data/externos/*
 data/pretrain/
+# Carpeta de entrenamiento de detector_v2: se regenera con scripts/prepare_v2.py.
+data/v2/
 # Salvo las anotaciones de Mines: Universe no tiene un zip de ese dataset, así que no
 # se pueden volver a descargar con un clic (data/README.md). CC BY 4.0.
 !data/externos/mines/

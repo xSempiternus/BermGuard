@@ -102,20 +102,23 @@ control.
    mismo protocolo que los folds: 60 épocas, `--patience 0 --no-val`, `last.pt`, y desde
    el preentrenado si ganó `pretrain`.
 
-   **Pendiente de herramienta.** Hoy `train_detector.py --data data/dataset/data.yaml`
-   sufre el mismo descarte que tenía LOVO: Ultralytics salta 36 de los 51 frames de
-   `video_01` porque sus etiquetas mezclan cajas y polígonos. Hace falta un script que
-   copie `data/dataset` a una carpeta de entrenamiento pasando cada etiqueta por
-   `bermguard.training.etiquetas.homogeneizar` (como hace `preparar_fold` en
-   `cross_validate.py`), con los cuatro videos en train y, si ganó `copypaste`, los frames
-   aumentados. Todavía no existe.
-
-   Con esa carpeta, el entrenamiento sería:
+   `train_detector.py --data data/dataset/data.yaml` directo sufriría el mismo descarte
+   que tenía LOVO: Ultralytics salta 36 de los 51 frames de `video_01` porque sus
+   etiquetas mezclan cajas y polígonos. `scripts/prepare_v2.py` arma `data/v2/` con los
+   cuatro videos en train, cada etiqueta pasada por `homogeneizar` y, si ganó
+   `copypaste`, los frames aumentados. Lee la variante y las épocas de `resumen.json`
+   (120 si marca `epocas_dobles`) y rechaza una decisión provisoria. Imprime el comando
+   de entrenamiento, que queda así:
 
    ```bash
-   python scripts/train_detector.py --data <carpeta>/data.yaml --model weights/yolo11s.pt \
-       --epochs 60 --patience 0 --no-val --batch 4 --name detector_v2
+   python scripts/prepare_v2.py
+   python scripts/train_detector.py --data data/v2/data.yaml --model weights/yolo11s.pt \
+       --epochs 60 --patience 0 --no-val --batch 4 --workers 0 --name detector_v2
    ```
+
+   Con `pretrain`, `--model` es el `best.pt` del preentrenamiento, que el script resuelve.
+   Verificado con el chequeo de etiquetas de Ultralytics: 0 frames descartados de 171
+   (342 con `copypaste`).
 
    Copiar su `last.pt` a `weights/detector_v2.pt` y agregar `!weights/detector_v2.pt` al
    `.gitignore`, que sólo deja pasar los pesos que la imagen necesita.
