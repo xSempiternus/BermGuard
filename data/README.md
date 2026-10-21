@@ -15,6 +15,7 @@ data/
 ├── externos/                datasets públicos descargados NO versionado
 │   ├── bulldozer/           bulldozer-lpoe2, export YOLO
 │   └── mines/               Mines, armado con import_universe.py
+│       └── anotaciones_universe.json                     SÍ versionado
 ├── pretrain_excluir.txt     imágenes públicas excluidas   SÍ versionado
 └── pretrain/                set de preentrenamiento       NO versionado
 ```
@@ -84,8 +85,10 @@ cuenta gratuita). Descomprimir el zip (`Bulldozer.v1i.yolo26.zip`) en
 [`mines-project/mines-jo13g`](https://universe.roboflow.com/mines-project/mines-jo13g)
 no tiene ninguna versión generada, así que no hay zip. Las anotaciones de sus imágenes con
 bulldozer se juntaron desde el navegador en `data/externos/mines/anotaciones_universe.json`
-(cómo, en el ADR 0004, revisión del 2026-10-20). Ese JSON no está en el repo: hay que
-conservarlo o volver a juntarlo. Con él:
+(cómo, en el ADR 0004, revisión del 2026-10-20). Ese JSON **sí se versiona**, porque no
+hay un zip para volver a descargarlo; tiene solo las anotaciones y las URL de las
+imágenes, con la fuente y la licencia (CC BY 4.0, Mines Project en Roboflow Universe).
+Con él:
 
 ```bash
 python scripts/import_universe.py data/externos/mines/anotaciones_universe.json \

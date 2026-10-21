@@ -30,8 +30,13 @@ data/dataset/labels/*.cache
 # Folds de la validacion cruzada: se regeneran con scripts/cross_validate.py.
 data/cv/
 # Datasets públicos descargados y su versión remapeada: se regeneran (ADR 0004).
-data/externos/
+data/externos/*
 data/pretrain/
+# Salvo las anotaciones de Mines: Universe no tiene un zip de ese dataset, así que no
+# se pueden volver a descargar con un clic (data/README.md). CC BY 4.0.
+!data/externos/mines/
+data/externos/mines/*
+!data/externos/mines/anotaciones_universe.json
 *.mp4
 *.avi
 *.mov
