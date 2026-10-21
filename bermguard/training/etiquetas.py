@@ -4,7 +4,7 @@ Las etiquetas propias mezclan, en un mismo frame, cajas (``c cx cy w h``: las
 pre-anotaciones que no se corrigieron) y polígonos (las corregidas a mano).
 Ultralytics 8.4 trata un archivo así como corrupto y **descarta la imagen entera**
 ("labels mix segment and detection rows"): con los datos de 2026-10 eso dejaba fuera
-36 de los 40 frames de video_01.
+36 de los 51 frames de video_01.
 
 Las etiquetas versionadas no se reescriben, porque la auditoría
 (``data/auditoria_etiquetas.json``) identifica cada corrección por la línea original.

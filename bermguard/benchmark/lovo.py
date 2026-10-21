@@ -67,7 +67,9 @@ que ``base``. Su mejora puede ser de cómputo y no de augmentation. ``base2x`` e
 con el doble de épocas, es decir, los mismos pasos que ``copypaste``. Si ``copypaste``
 sería candidata, además tiene que dar ``mejora`` en el AP@0.5 del bulldozer contra
 ``base2x``. Sin los folds de ``base2x``, la decisión queda ``pendiente_control`` y
-``scripts/gpu_session.py`` los entrena. ``base2x`` nunca es candidata: es un control.
+``scripts/gpu_session.py`` los entrena. ``base2x`` nunca es candidata: es un control. Si
+``base2x`` da ``mejora`` contra ``base``, ``base`` estaba subentrenada y la decisión marca
+``epocas_dobles``: la ganadora se reentrena para v2 con el doble de épocas.
 """
 
 from __future__ import annotations
@@ -427,7 +429,10 @@ def elegir_variante(
         set(comparaciones) - set(VARIANTES)
     ):
         if variante == CONTROL:
-            evaluacion[variante] = {"candidata": False, "motivos": ["control de cómputo"]}
+            evaluacion[variante] = {
+                "candidata": False,
+                "motivos": ["control de cómputo de copypaste, no compite"],
+            }
             continue
         bull = comparaciones[variante]["bulldozer"]["ap50"]
         caex = comparaciones[variante]["caex"]["ap50"]
@@ -443,6 +448,7 @@ def elegir_variante(
             motivos.append(f"AP@0.5 caex cae en media más de {regla.caida_media_caex}")
         if caex["n_folds"] and caex["minimo"] < -regla.caida_fold_caex:
             motivos.append(f"AP@0.5 caex cae más de {regla.caida_fold_caex} en algún fold")
+        control: dict[str, Any] | None = None
         if variante == "copypaste" and not motivos:
             if set(datos.get(CONTROL, {})) != folds_base:
                 pendiente_control = True
@@ -457,6 +463,8 @@ def elegir_variante(
                         "(la mejora puede ser de pasos de entrenamiento)"
                     )
         evaluacion[variante] = {"candidata": not motivos, "motivos": motivos}
+        if control is not None:
+            evaluacion[variante]["contra_control"] = control
         if not motivos:
             candidatas.append((variante, bull["media"]))
     if not candidatas:
@@ -472,12 +480,19 @@ def elegir_variante(
         )
     if pendiente_control:
         motivo += f" Provisoria: falta entrenar {CONTROL} para juzgar a copypaste."
+    # Si el doble de épocas mejora a base, base estaba subentrenada: la ganadora (sea
+    # cual sea) se reentrena para v2 con esas épocas.
+    doble = comparaciones.get(CONTROL, {}).get("bulldozer", {}).get("ap50", {})
+    epocas_dobles = doble.get("veredicto") == "mejora"
+    if epocas_dobles:
+        motivo += f" {CONTROL} mejora a base: entrenar v2 con el doble de épocas."
     return {
         "ganadora": ganadora,
         "motivo": motivo,
         "regla": asdict(regla),
         "evaluacion": evaluacion,
         "pendiente_control": pendiente_control,
+        "epocas_dobles": epocas_dobles,
     }
 
 
@@ -615,8 +630,20 @@ def a_markdown(resumen: Mapping[str, Any], comando: str = "") -> str:
     lineas += ["", "#### Decisión", "", f"**Variante elegida: `{dec['ganadora']}`.** "]
     lineas[-1] += dec["motivo"]
     for v, e in dec["evaluacion"].items():
-        estado = "candidata" if e["candidata"] else "descartada: " + "; ".join(e["motivos"])
+        if v == CONTROL:
+            estado = "; ".join(e["motivos"])
+        else:
+            estado = "candidata" if e["candidata"] else "descartada: " + "; ".join(e["motivos"])
         lineas += [f"- `{v}`: {estado}."]
+        c = e.get("contra_control")
+        if c:
+            lineas += [
+                f"  - AP@0.5 bulldozer contra `{CONTROL}` (mismos pasos): media "
+                f"{_f(c['media'], True)}, mín {_f(c['minimo'], True)}, máx "
+                f"{_f(c['maximo'], True)}, folds mejor/peor/empate "
+                f"{c['folds_mejora']}/{c['folds_empeora']}/{c['folds_empate']}: "
+                f"{c['veredicto']}."
+            ]
 
     umbrales = resumen["umbral_fuera_de_fold"]
     ganadora = dec["ganadora"]

@@ -328,6 +328,35 @@ def test_copypaste_que_no_supera_al_control_de_pasos_no_gana():
     assert d["evaluacion"]["base2x"]["candidata"] is False
 
 
+def test_si_base2x_mejora_a_base_se_recomiendan_epocas_dobles():
+    datos = {
+        "base": variante([0.4] * 4),
+        "copypaste": variante([0.6] * 4),
+        "base2x": variante([0.6] * 4),
+    }
+    d = decidir(datos)
+    assert d["ganadora"] == "base"
+    assert d["epocas_dobles"] is True
+    assert "doble de épocas" in d["motivo"]
+    assert d["evaluacion"]["copypaste"]["contra_control"]["veredicto"] != "mejora"
+    assert (
+        decidir({"base": variante([0.4] * 4), "base2x": variante([0.4] * 4)})["epocas_dobles"]
+        is False
+    )
+
+
+def test_el_markdown_muestra_copypaste_contra_el_control():
+    datos = {
+        "base": variante([0.4] * 4),
+        "copypaste": variante([0.6] * 4),
+        "base2x": variante([0.45] * 4),
+    }
+    md = a_markdown(resumir_lovo(datos))
+    assert "Variante elegida: `copypaste`" in md
+    assert "contra `base2x` (mismos pasos): media +0.150" in md
+    assert "`base2x`: control de cómputo de copypaste, no compite." in md
+
+
 def test_el_control_no_afecta_a_pretrain():
     datos = {
         "base": variante([0.4] * 4),

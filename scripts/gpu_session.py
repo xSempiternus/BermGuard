@@ -10,7 +10,7 @@ preentrenamiento y los folds terminados.
 
 Uso:
     python scripts/gpu_session.py --check     # sólo los chequeos, sin tocar la GPU
-    python scripts/gpu_session.py             # chequeos, LOVO (3 variantes) y resumen
+    python scripts/gpu_session.py             # chequeos, LOVO (+ base2x si hace falta), resumen
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from pathlib import Path
 
 VARIANTES = ("base", "copypaste", "pretrain")
 VRAM_MINIMA_MB = 2800  # con batch 4 el entrenamiento usa ~2.5 GB
-DISCO_MINIMO_GB = 5  # 13 entrenamientos con checkpoints de 20-80 MB, más los folds
+DISCO_MINIMO_GB = 5  # 13-17 entrenamientos (con base2x), checkpoints de 20-80 MB, folds
 PROCESOS_PESADOS = ("blender", "rocketleague", "valorant", "obs64")
 RESUMEN = Path("docs/experimentos/lovo/resumen.json")
 
@@ -135,7 +135,7 @@ def main() -> None:
     # Si copypaste gana, puede ser por hacer el doble de pasos: se entrena el control
     # base2x (unas 3,4 h más) y se vuelve a decidir. Ver ADR 0009.
     if json.loads(RESUMEN.read_text(encoding="utf-8"))["decision"].get("pendiente_control"):
-        print("\ncopypaste es candidata: entrenando el control base2x (mismos pasos)")
+        print("\ncopypaste es candidata contra base: entrenando el control base2x (mismos pasos)")
         lovo(["base2x"])
     print(
         "\nListo. Revisar docs/experimentos/lovo/resumen.md: variante ganadora y umbral "

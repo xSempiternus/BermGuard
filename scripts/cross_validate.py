@@ -15,6 +15,11 @@ fold**, un frame aumentado por cada frame de entrenamiento, con uno o dos
 bulldozers recortados de los videos de entrenamiento de ese mismo fold. Un recorte
 del video de validación sería fuga.
 
+La variante ``base2x`` es ``base`` con el doble de épocas. ``copypaste`` duplica las
+imágenes de entrenamiento y, con las mismas épocas, hace el doble de pasos: ``base2x``
+le iguala los pasos, para separar el efecto de la augmentation del de entrenar más
+(ADR 0009, revisión del 2026-10-21).
+
 La variante ``pretrain`` usa la misma partición que ``base`` y cambia sólo el punto
 de partida: en vez de los pesos COCO, un modelo afinado antes con datasets públicos
 de maquinaria (``scripts/prepare_pretrain.py``, ADR 0004). Ese preentrenamiento se
