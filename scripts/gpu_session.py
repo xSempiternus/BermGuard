@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 VARIANTES = ("base", "copypaste", "pretrain")
-VRAM_MINIMA_MB = 2800  # con batch 4 el entrenamiento usa ~2.5 GB
+VRAM_MINIMA_MB = 2400  # medido 2026-10-21: un fold con batch 4 ocupa ~2.0 GB
 DISCO_MINIMO_GB = 5  # 13-17 entrenamientos (con base2x), checkpoints de 20-80 MB, folds
 PROCESOS_PESADOS = ("blender", "rocketleague", "valorant", "obs64")
 RESUMEN = Path("docs/experimentos/lovo/resumen.json")
